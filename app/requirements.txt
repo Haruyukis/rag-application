@@ -1,0 +1,5 @@
+fastapi
+pydantic
+uvicorn
+loguru
+llama-index-experimental
