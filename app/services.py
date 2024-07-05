@@ -5,6 +5,7 @@ from loguru import logger
 
 from config import ollama_base_url
 
+
 def generate_response(user_query: str):
     logger.info("Loading documents in process...")
     documents = SimpleDirectoryReader("./data/demo").load_data()
@@ -13,7 +14,9 @@ def generate_response(user_query: str):
     logger.info("Setup the embedding model and llm")
     # bge-base embedding model and llm
     Settings.embed_model = HuggingFaceEmbedding(model_name="BAAI/bge-base-en-v1.5")
-    Settings.llm = Ollama(model="llama3", request_timeout=360.0, base_url=ollama_base_url)
+    Settings.llm = Ollama(
+        model="llama3", request_timeout=360.0, base_url=ollama_base_url
+    )
 
     logger.info("Indexing the documents")
     index = VectorStoreIndex.from_documents(documents, show_progress=True)
