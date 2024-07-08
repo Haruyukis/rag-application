@@ -1,6 +1,13 @@
-from llama_index.core import Settings, SQLDatabase, VectorStoreIndex
+from llama_index.core import (
+    Settings,
+    SQLDatabase,
+    VectorStoreIndex,
+    load_index_from_storage,
+)
 from llama_index.core.retrievers import SQLRetriever
 from llama_index.core.callbacks import CallbackManager
+from llama_index.core.schema import TextNode
+from llama_index.core.storage import StorageContext
 from llama_index.core.query_pipeline import (
     FnComponent,
     QueryPipeline as QP,
@@ -15,8 +22,8 @@ from llama_index.embeddings.huggingface import HuggingFaceEmbedding
 from llama_index.llms.ollama import Ollama
 
 
-from sqlalchemy import create_engine, MetaData, Column, String, Table
-from typing import List
+from sqlalchemy import create_engine, MetaData, Column, String, Table, text
+from typing import List, Dict
 from pathlib import Path
 import re, os, json
 
@@ -63,7 +70,9 @@ class SshAnalyzer:
         # Get Table Context
         self.sql_retriever = SQLRetriever(self.sql_database)
 
-        self.table_parser_component = FnComponent(fn=self.get_table_context_str)
+        self.table_parser_component = FnComponent(
+            fn=self.get_table_context_and_rows_str
+        )
 
         # Parse Response to SQL
         self.sql_parser_component = FnComponent(fn=self.parse_response_to_sql)
@@ -169,10 +178,55 @@ class SshAnalyzer:
         obj_retriever = obj_index.as_retriever(similarity_top_k=3)
         return obj_retriever
 
-    def get_table_context_str(self, table_schema_objs: List[SQLTableSchema]):
+    def get_table_context_and_rows_str(
+        self, query_str: str, strtable_schema_objs: List[SQLTableSchema]
+    ):
         """Get table context string."""
+
+        def index_all_tables(
+            sql_database: SQLDatabase, table_index_dir: str = "table_index_dir"
+        ) -> Dict[str, VectorStoreIndex]:
+            """Index all tables."""
+
+            if not Path(table_index_dir).exists():
+                os.makedirs(table_index_dir)
+
+            # Creation d'un dictionnaire de VectorStoreIndex:
+
+            vector_index_dict = {}
+            engine = sql_database.engine
+            print(len(sql_database.get_usable_table_names()))
+            for table_name in sql_database.get_usable_table_names():
+                print(f"Indexing rows in table: {table_name}")
+
+                if not os.path.exists(f"{table_index_dir}/{table_name}"):
+                    with engine.connect() as conn:
+                        result = conn.execute(text(f"SELECT * FROM {table_name}"))
+                        rows = result.fetchall()
+
+                        rows_to_tuple = []
+                        for row in rows:
+                            rows_to_tuple.append(tuple(row))
+
+                    nodes = [TextNode(text=str(t)) for t in rows_to_tuple]
+
+                    index = VectorStoreIndex(nodes, show_progress=True)
+
+                    vector_index_dict[table_name] = index
+                    index.storage_context.persist(f"{table_index_dir}/{table_name}")
+                else:
+                    storage_context = StorageContext.from_defaults(
+                        persist_dir=f"{table_index_dir}/{table_name}"
+                    )
+                    index = load_index_from_storage(storage_context)
+
+                    vector_index_dict[table_name] = index
+            return vector_index_dict
+
         context_strs = []
-        for table_schema_obj in table_schema_objs:
+        vector_index_dict = index_all_tables(self.sql_database)
+
+        for table_schema_obj in strtable_schema_objs:
             table_info = self.sql_database.get_single_table_info(
                 table_schema_obj.table_name
             )
@@ -181,6 +235,16 @@ class SshAnalyzer:
                 table_opt_context += table_schema_obj.context_str
                 table_info += table_opt_context
 
+            retriever = vector_index_dict[table_schema_obj.table_name].as_retriever(
+                similarity_top_k=2
+            )
+
+            relevant_nodes = retriever.retrieve(query_str)
+            if len(relevant_nodes) > 0:
+                table_row_context = "\nHere are some relevant example rows (values in the same order as columns above)"
+                for node in relevant_nodes:
+                    table_row_context += str(node.get_content()) + "\n"
+                    table_info += table_row_context
             context_strs.append(table_info)
         return "\n\n".join(context_strs)
 
@@ -224,11 +288,10 @@ class SshAnalyzer:
 
     def get_response_synthesis_prompt_template(self):
         response_synthesis_prompt_str = (
-            "You are analyzing ssh logs data for security.\n"
-            "Having all data displayed is really important.\n"
             "Given an input question, generate a response to answer the query.\n"
-            "Do not shorten the answer.\n"
             "Respect as much as possible the user query.\n"
+            "Make sure to answer the query.\n"
+            "The response can be long but make sure to print the complete list of the SQL response without the SQLQuery.\n"
             "Query: {query_str}\n"
             "SQL: {sql_query}\n"
             "SQL Response: {context_str}\n"
@@ -256,10 +319,14 @@ class SshAnalyzer:
             verbose=True,
         )
 
-        qp.add_chain(["input", "table_retriever", "table_output_parser"])
-
+        qp.add_link("input", "table_retriever")
+        qp.add_link("input", "table_output_parser", dest_key="query_str")
         qp.add_link("input", "text2sql_prompt", dest_key="query_str")
+        qp.add_link(
+            "table_retriever", "table_output_parser", dest_key="strtable_schema_objs"
+        )
         qp.add_link("table_output_parser", "text2sql_prompt", dest_key="schema")
+
         qp.add_chain(
             ["text2sql_prompt", "text2sql_llm", "sql_output_parser", "sql_retriever"]
         )
