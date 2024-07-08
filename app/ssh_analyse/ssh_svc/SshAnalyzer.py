@@ -32,6 +32,8 @@ from config import ollama_base_url
 
 
 class SshAnalyzer:
+    """Ssh Analyzer Tool"""
+
     def __init__(self, path: str):
         """Constructor"""
         # Init
