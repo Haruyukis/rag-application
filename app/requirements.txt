@@ -1,5 +1,8 @@
 fastapi
-pydantic
 uvicorn
+pydantic
 loguru
 llama-index-experimental
+sqlalchemy
+llama-index-embeddings-huggingface
+llama-index-llms-ollama
