@@ -1,6 +1,6 @@
 from fastapi import FastAPI
-from services import generate_response
-from ssh_analyse.ssh_svc.main import analyse
+from services import generate_response, test
+from ssh_analyse.ssh_svc.main import analyse, agent_analyse
 
 app = FastAPI()
 
@@ -14,4 +14,16 @@ def generate(user_query: str):
 @app.get("/api/analyse")
 def ssh_analyse(user_query: str, path: str):
     """Analyzing ssh log data"""
-    return analyse(user_query, path).message.content
+    return analyse(user_query, path)
+
+
+@app.get("/api/agent")
+def ssh_agent(user_query: str, path: str):
+    """Analyzing ssh log data with Agent"""
+    return agent_analyse(user_query, path)
+
+
+@app.get("/api/sentence_splitter")
+def sentence_splitter(user_query: str, path: str):
+    """Analyzing ssh log data with Agent"""
+    return test(user_query)

@@ -89,7 +89,8 @@ class SshAnalyzer:
         self.qp = self.get_query_pipeline()
 
     def run(self, user_query: str):
-        return self.qp.run(query=user_query)
+        """Generate an answer to the user_query."""
+        return self.qp.run(query=user_query).message.content
 
     def create_table_from_data(self, path: str):
         pattern_failed = r"^(\w{3} \d{2} \d{2}:\d{2}:\d{2}) \S+ sshd\[\d+\]: Connection closed by (?:authenticating|invalid) user (\S+) (\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}) port (\d+) \[preauth\]$"
@@ -197,7 +198,6 @@ class SshAnalyzer:
 
             vector_index_dict = {}
             engine = sql_database.engine
-            print(len(sql_database.get_usable_table_names()))
             for table_name in sql_database.get_usable_table_names():
                 print(f"Indexing rows in table: {table_name}")
 
@@ -290,10 +290,11 @@ class SshAnalyzer:
 
     def get_response_synthesis_prompt_template(self):
         response_synthesis_prompt_str = (
-            "Given an input question, generate a response to answer the query.\n"
-            "Respect as much as possible the user query.\n"
-            "Make sure to answer the query.\n"
-            "The response can be long but make sure to print the complete list of the SQL response without the SQLQuery.\n"
+            # "Given an input question, generate a response to answer the query.\n"
+            # "Respect as much as possible the user query.\n"
+            # "Make sure to answer the query.\n"
+            "Let's first understand the problem and devise a plan to solve the problem.\n"
+            "Then, you carry out the plan and solve the problem step by step.\n"
             "Query: {query_str}\n"
             "SQL: {sql_query}\n"
             "SQL Response: {context_str}\n"
