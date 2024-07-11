@@ -31,8 +31,8 @@ from ssh_analyse.ssh_model import TableInfo
 from config import ollama_base_url
 
 
-class SshAnalyzer:
-    """Ssh Analyzer Tool"""
+class SshAgent:
+    """Ssh Agent Tool"""
 
     def __init__(self, path: str):
         """Constructor"""
@@ -90,7 +90,7 @@ class SshAnalyzer:
 
     def run(self, user_query: str):
         """Generate an answer to the user_query."""
-        return self.qp.run(query=user_query).message.content
+        return self.qp.run(query=user_query)
 
     def create_table_from_data(self, path: str):
         pattern_failed = r"^(\w{3} \d{2} \d{2}:\d{2}:\d{2}) \S+ sshd\[\d+\]: Connection closed by (?:authenticating|invalid) user (\S+) (\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}) port (\d+) \[preauth\]$"
@@ -227,28 +227,34 @@ class SshAnalyzer:
 
         context_strs = []
         vector_index_dict = index_all_tables(self.sql_database)
+        retry = 0
+        while 3 > retry:
+            try:
+                for table_schema_obj in strtable_schema_objs:
+                    table_info = self.sql_database.get_single_table_info(
+                        table_schema_obj.table_name
+                    )
+                    if table_schema_obj.context_str:
+                        table_opt_context = " The table description is: "
+                        table_opt_context += table_schema_obj.context_str
+                        table_info += table_opt_context
 
-        for table_schema_obj in strtable_schema_objs:
-            table_info = self.sql_database.get_single_table_info(
-                table_schema_obj.table_name
-            )
-            if table_schema_obj.context_str:
-                table_opt_context = " The table description is: "
-                table_opt_context += table_schema_obj.context_str
-                table_info += table_opt_context
+                    retriever = vector_index_dict[
+                        table_schema_obj.table_name
+                    ].as_retriever(similarity_top_k=2)
 
-            retriever = vector_index_dict[table_schema_obj.table_name].as_retriever(
-                similarity_top_k=2
-            )
-
-            relevant_nodes = retriever.retrieve(query_str)
-            if len(relevant_nodes) > 0:
-                table_row_context = "\nHere are some relevant example rows (values in the same order as columns above)"
-                for node in relevant_nodes:
-                    table_row_context += str(node.get_content()) + "\n"
-                    table_info += table_row_context
-            context_strs.append(table_info)
-        return "\n\n".join(context_strs)
+                    relevant_nodes = retriever.retrieve(query_str)
+                    if len(relevant_nodes) > 0:
+                        table_row_context = "\nHere are some relevant example rows (values in the same order as columns above)"
+                        for node in relevant_nodes:
+                            table_row_context += str(node.get_content()) + "\n"
+                            table_info += table_row_context
+                    context_strs.append(table_info)
+                return "\n\n".join(context_strs)
+            except Exception as e:
+                print("Indexing failed, please try again.")
+                retry += 1
+        raise Exception
 
     def parse_response_to_sql(self, response: ChatResponse) -> str:
         """Parse response to SQL."""
@@ -291,10 +297,9 @@ class SshAnalyzer:
 
     def get_response_synthesis_prompt_template(self):
         response_synthesis_prompt_str = (
-            "Given an input question, generate a response to answer the query.\n"
-            "Respect as much as possible the user query.\n"
-            "Make sure to answer the query.\n"
-            "Do not summarize the answer.\n"
+            "Given the SQL Response, analyze the text.\n"
+            "Print the analysis.\n"
+            "Then, make sure to print the whole text from the SQL Response.\n"
             "Query: {query_str}\n"
             "SQL: {sql_query}\n"
             "SQL Response: {context_str}\n"
@@ -316,8 +321,6 @@ class SshAnalyzer:
                 "text2sql_llm": Settings.llm,
                 "sql_output_parser": self.sql_parser_component,
                 "sql_retriever": self.sql_retriever,
-                "response_synthesis_prompt": self.response_synthesis_prompt,
-                "response_synthesis_llm": Settings.llm,
             },
             verbose=True,
         )
@@ -333,13 +336,5 @@ class SshAnalyzer:
         qp.add_chain(
             ["text2sql_prompt", "text2sql_llm", "sql_output_parser", "sql_retriever"]
         )
-        qp.add_link(
-            "sql_output_parser", "response_synthesis_prompt", dest_key="sql_query"
-        )
-        qp.add_link(
-            "sql_retriever", "response_synthesis_prompt", dest_key="context_str"
-        )
-        qp.add_link("input", "response_synthesis_prompt", dest_key="query_str")
-        qp.add_link("response_synthesis_prompt", "response_synthesis_llm")
 
         return qp

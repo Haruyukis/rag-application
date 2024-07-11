@@ -30,6 +30,7 @@ from llama_index.core.agent.react.output_parser import ReActOutputParser
 
 from typing import Dict, Any, List
 from sqlalchemy import Column, MetaData, String, create_engine
+from ssh_analyse.ssh_svc.SshAnalyzer import SshAnalyzer
 from config import ollama_base_url
 from ssh_analyse.ssh_svc.ssh_database import (
     create_table_from_data,
@@ -37,6 +38,22 @@ from ssh_analyse.ssh_svc.ssh_database import (
     structuring_table,
     object_indexing,
 )
+
+from llama_index.core.query_engine import CustomQueryEngine
+from llama_index.core.retrievers import BaseRetriever
+from llama_index.core import get_response_synthesizer
+from llama_index.core.response_synthesizers import BaseSynthesizer
+
+
+class RAGStringQueryEngine(CustomQueryEngine):
+    """RAG String Query Engine."""
+
+    qp: QueryPipeline
+
+    def custom_query(self, query_str: str):
+        response = self.qp.run(query_str)
+
+        return str(response)
 
 
 class SshAgent:
@@ -85,7 +102,7 @@ class SshAgent:
             query_engine=query_engine,
             name="sql_tool",
             description=(
-                "Useful for translating a natural language query into a SQL query. Table names are ['succesful_logins', 'failed_logins']"
+                "Useful for translating a natural language query into a SQL query."
             ),
         )
         dict = index_all_tables(self.sql_database)
@@ -99,7 +116,13 @@ class SshAgent:
             for key, value in dict.items()
         ]
 
-        self.tools = [self.sql_tool]
+        self.tools = [
+            QueryEngineTool.from_defaults(
+                RAGStringQueryEngine(qp=SshAnalyzer(path).qp),
+                name="ssh_analyzer",
+                description="Useful for retrieving relevant rows in the sql_database.",
+            )
+        ]
         # Setup ReAct Agent Pipeline
         self.agent_input_component = AgentInputComponent(fn=self.agent_input_fn)
 
@@ -177,7 +200,7 @@ class SshAgent:
         observation_step = ObservationReasoningStep(observation=str(tool_output))
         state["current_reasoning"].append(observation_step)
         # TODO: get output
-
+        print(observation_step.get_content())
         return {"response_str": observation_step.get_content(), "is_done": False}
 
     def process_response_fn(
