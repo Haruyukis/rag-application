@@ -8,4 +8,4 @@ RUN pip install -r requirements.txt
 
 EXPOSE 8000
 
-CMD ["uvicorn", "controllers:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+CMD ["uvicorn", "src/controllers:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
