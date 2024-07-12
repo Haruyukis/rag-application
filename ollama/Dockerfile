@@ -10,4 +10,6 @@ RUN chmod +x model_pulling.sh
 
 RUN ./model_pulling.sh
 
+EXPOSE 11434
+
 CMD ollama serve

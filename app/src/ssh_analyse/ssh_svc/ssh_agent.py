@@ -5,6 +5,7 @@ from llama_index.core.llms import ChatMessage, ChatResponse
 from llama_index.core.tools import QueryEngineTool, BaseTool
 from llama_index.core.indices.struct_store.sql_query import SQLTableRetrieverQueryEngine
 from llama_index.core.chat_engine.types import AgentChatResponse
+from llama_index.core.tools import FunctionTool
 
 from llama_index.core.query_pipeline import (
     AgentInputComponent,
@@ -32,7 +33,7 @@ from typing import Dict, Any, List
 from sqlalchemy import Column, MetaData, String, create_engine
 from src.ssh_analyse.ssh_svc.ssh_analyzer import SshAnalyzer
 from src.config import ollama_base_url
-from src.ssh_analyse.ssh_svc.ssh_database import (
+from app.src.ssh_analyse.ssh_svc.helpers import (
     create_table_from_data,
     index_all_tables,
     structuring_table,
@@ -65,64 +66,9 @@ class SshAgent:
             model="llama3", request_timeout=360.0, base_url=ollama_base_url
         )
 
-        self.engine = create_engine("sqlite:///ssh_log_agent.db")
-        self.sql_database = SQLDatabase(self.engine)
-        self.metadata_obj = MetaData()
-        self.table_names = ["successful_logins", "failed_logins"]
-        self.columns = [
-            [
-                Column("user", String),
-                Column("login_time", String),
-                Column("log_message", String),
-            ],
-            [
-                Column("user", String),
-                Column("attempt_time", String),
-                Column("log_message", String),
-            ],
-        ]
+        self.sql_analyzer_tool = SshAnalyzer(path)
 
-        # Creating the database
-        create_table_from_data(
-            path, self.table_names, self.metadata_obj, self.columns, self.engine
-        )
-
-        # Metadata for each table
-        self.table_infos = structuring_table(self.table_names)
-
-        # Object Index
-        self.obj_retriever = object_indexing(self.engine, self.table_infos)
-
-        query_engine = SQLTableRetrieverQueryEngine(
-            self.sql_database, self.obj_retriever
-        )
-
-        # ObjectIndex QueryEngine Tool & Vector Tools
-        self.sql_tool = QueryEngineTool.from_defaults(
-            query_engine=query_engine,
-            name="sql_tool",
-            description=(
-                "Useful for translating a natural language query into a SQL query."
-            ),
-        )
-        dict = index_all_tables(self.sql_database)
-
-        self.vector_tools = [
-            QueryEngineTool.from_defaults(
-                query_engine=value.as_query_engine(),
-                description=f"Useful for getting row examples from the table {key}",
-                name=f"{key}_tool",
-            )
-            for key, value in dict.items()
-        ]
-
-        self.tools = [
-            QueryEngineTool.from_defaults(
-                query_engine=RAGStringQueryEngine(qp=SshAnalyzer(path).qp),
-                name="ssh_analyzer",
-                description="Useful for retrieving relevant rows in the sql_database.",
-            )
-        ]
+        self.tools = [FunctionTool.from_defaults(fn=self.sql_analyzer_tool.run)]
         # Setup ReAct Agent Pipeline
         self.agent_input_component = AgentInputComponent(fn=self.agent_input_fn)
 
