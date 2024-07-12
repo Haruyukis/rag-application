@@ -1,6 +1,6 @@
 from fastapi import FastAPI
-from services import generate_response, test
-from ssh_analyse.ssh_svc.main import analyse, agent_analyse
+from src.services import generate_response, test
+from src.ssh_analyse.ssh_svc.main import analyse, agent_analyse
 
 app = FastAPI()
 

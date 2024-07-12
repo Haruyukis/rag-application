@@ -6,15 +6,20 @@ from llama_index.core.llama_dataset import LabelledRagDataset
 from llama_index.core.llama_pack import download_llama_pack
 from llama_index.llms.ollama import Ollama
 from llama_index.embeddings.huggingface import HuggingFaceEmbedding
-from llama_index.core.evaluation import RetrieverEvaluator, EmbeddingQAFinetuneDataset, generate_question_context_pairs
+from llama_index.core.evaluation import (
+    RetrieverEvaluator,
+    EmbeddingQAFinetuneDataset,
+    generate_question_context_pairs,
+)
 from llama_index.core.node_parser import SentenceSplitter
 
 from loguru import logger
 
-from config import ollama_base_url
+from src.config import ollama_base_url
 import os
 
 import pandas as pd
+
 
 # Code from Llama-index in RetrieverEvaluator
 def display_results(name, eval_results):
@@ -29,13 +34,13 @@ def display_results(name, eval_results):
 
     columns = {
         "retrievers": [name],
-        **{k: [full_df[k].mean()] for k in ["hit_rate", "mrr"] },
+        **{k: [full_df[k].mean()] for k in ["hit_rate", "mrr"]},
     }
-
 
     metric_df = pd.DataFrame(columns)
 
     return metric_df
+
 
 # Initialization
 logger.info("Doing some initialisation...")
@@ -57,7 +62,9 @@ query_engine = index.as_query_engine()
 retriever = index.as_retriever(similarity_top_k=2)
 
 # Instantiate a DatasetGenerator and Create a QA dataset for the Generation.
-dataset_generator = RagDatasetGenerator.from_documents(documents, llm=Settings.llm, num_questions_per_chunk=2, show_progress=True)
+dataset_generator = RagDatasetGenerator.from_documents(
+    documents, llm=Settings.llm, num_questions_per_chunk=2, show_progress=True
+)
 
 if os.path.exists("rag_dataset.json"):
     logger.info("Generation QA dataset already exist")
@@ -73,19 +80,27 @@ if os.path.exists("retriever_dataset.json"):
     retriever_dataset = EmbeddingQAFinetuneDataset.from_json("retriever_dataset.json")
 else:
     logger.info("Retrieval QA dataset already exist")
-    retriever_dataset = generate_question_context_pairs(documents, llm=Settings.llm, num_questions_per_chunk=2)
+    retriever_dataset = generate_question_context_pairs(
+        documents, llm=Settings.llm, num_questions_per_chunk=2
+    )
     retriever_dataset.save_json("retriever_dataset.json")
 
 
 # Evaluation
-rag_evaluator = RagEvaluatorPack(query_engine=query_engine, rag_dataset=rag_dataset, judge_llm=Settings.llm)
-retriever_evaluator = RetrieverEvaluator.from_metric_names(["hit_rate", "mrr"], retriever=retriever)
+rag_evaluator = RagEvaluatorPack(
+    query_engine=query_engine, rag_dataset=rag_dataset, judge_llm=Settings.llm
+)
+retriever_evaluator = RetrieverEvaluator.from_metric_names(
+    ["hit_rate", "mrr"], retriever=retriever
+)
+
 
 async def get_retriever_evaluation():
     logger.info("Getting retriever evaluation result")
     eval_results = await retriever_evaluator.aevaluate_dataset(retriever_dataset)
     return eval_results
-    
+
+
 eval_results = asyncio.run(get_retriever_evaluation())
 
 logger.info("Getting generation evaluation result")

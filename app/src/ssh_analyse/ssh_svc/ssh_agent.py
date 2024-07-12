@@ -30,9 +30,9 @@ from llama_index.core.agent.react.output_parser import ReActOutputParser
 
 from typing import Dict, Any, List
 from sqlalchemy import Column, MetaData, String, create_engine
-from ssh_analyse.ssh_svc.ssh_analyzer import SshAnalyzer
-from config import ollama_base_url
-from ssh_analyse.ssh_svc.ssh_database import (
+from src.ssh_analyse.ssh_svc.ssh_analyzer import SshAnalyzer
+from src.config import ollama_base_url
+from src.ssh_analyse.ssh_svc.ssh_database import (
     create_table_from_data,
     index_all_tables,
     structuring_table,

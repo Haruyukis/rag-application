@@ -17,8 +17,8 @@ from llama_index.core.callbacks import CallbackManager
 from typing import List, Dict
 from sqlalchemy import Column, MetaData, Table, text
 
-from ssh_analyse.ssh_model import TableInfo
-from config import ollama_base_url
+from src.ssh_analyse.ssh_model import TableInfo
+from src.config import ollama_base_url
 
 from pathlib import Path
 import re, json, os

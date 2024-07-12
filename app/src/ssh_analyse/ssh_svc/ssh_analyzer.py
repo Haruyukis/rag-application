@@ -13,7 +13,6 @@ from llama_index.core.storage import StorageContext
 from llama_index.core.query_pipeline import (
     FnComponent,
     QueryPipeline as QP,
-    Link,
     InputComponent,
 )
 from llama_index.core.prompts import PromptTemplate

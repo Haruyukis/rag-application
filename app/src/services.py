@@ -4,7 +4,7 @@ from llama_index.embeddings.huggingface import HuggingFaceEmbedding
 from llama_index.llms.ollama import Ollama
 from loguru import logger
 
-from config import ollama_base_url
+from src.config import ollama_base_url
 
 
 def generate_response(user_query: str):
