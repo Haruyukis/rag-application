@@ -1,189 +1,166 @@
-from llama_index.core import Settings
+from llama_index.core import Settings, PromptTemplate, Response
 from llama_index.core.callbacks import CallbackManager
 from llama_index.llms.ollama import Ollama
-from llama_index.core.llms import ChatMessage, ChatResponse
-from llama_index.core.tools import BaseTool
+from llama_index.embeddings.huggingface import HuggingFaceEmbedding
 from llama_index.core.chat_engine.types import AgentChatResponse
-from llama_index.core.tools import FunctionTool
 
-from llama_index.core.query_pipeline import (
-    AgentInputComponent,
-    AgentFnComponent,
-    ToolRunnerComponent,
-    QueryPipeline,
-)
-from llama_index.core.base.llms.types import MessageRole
+from llama_index.core.query_pipeline import StatefulFnComponent, QueryPipeline as QP
 
+from src.ssh_analyse.ssh_svc.ssh_analyzer import SshAnalyzer
 
-from llama_index.core.agent.react.types import (
-    ObservationReasoningStep,
-    ActionReasoningStep,
-    ResponseReasoningStep,
-)
 from llama_index.core.agent import (
     Task,
-    ReActChatFormatter,
     QueryPipelineAgentWorker,
     AgentRunner,
 )
-from llama_index.core.agent.react.output_parser import ReActOutputParser
 
-from typing import Dict, Any, List
+from loguru import logger
 
-from src.ssh_analyse.ssh_svc.ssh_analyzer import SshAnalyzer
+from typing import Dict, Any, Tuple
+
+from src.helpers.create_table import create_table_from_data
 from src.config import ollama_base_url
+from sqlalchemy import MetaData, String, Column, create_engine
+from src.ssh_analyse.ssh_svc.helpers import structuring_table
 
 
 class SshAgent:
-    """Ssh Agent"""
+    """Ssh Retry Agent"""
 
     def __init__(self, path: str):
-        Settings.callback_manager = CallbackManager()
+        """Constructor"""
+        # Init
+        Settings.embed_model = HuggingFaceEmbedding(model_name="BAAI/bge-base-en-v1.5")
         Settings.llm = Ollama(
             model="llama3", request_timeout=360.0, base_url=ollama_base_url
         )
+        Settings.callback_manager = CallbackManager()
 
-        self.sql_analyzer_tool = SshAnalyzer(path)
+        # Agent Input Component
+        self.agent_input = StatefulFnComponent(fn=self.agent_input_fn)
 
-        self.tools = [FunctionTool.from_defaults(fn=self.sql_analyzer_tool.run)]
-        # Setup ReAct Agent Pipeline
-        self.agent_input_component = AgentInputComponent(fn=self.agent_input_fn)
+        # Retry Component
+        self.retry_prompt = PromptTemplate(self.retry_prompt_str_fn())
+        self.max_iter = 3
+        # SQL Query Engine / Ssh Analyzer
+        self.sql_query_engine = SshAnalyzer(path).qp
 
-        # Setup ReAct prompt
-        self.react_prompt_component = AgentFnComponent(
-            fn=self.react_prompt_fn,
-            partial_dict={
-                "tools": self.tools,
-            },
+        # Validate Prompt Component
+        self.validate_prompt = PromptTemplate(self.validate_prompt_str_fn())
+
+        # Agent Output Component
+        self.agent_output = StatefulFnComponent(fn=self.agent_output_fn)
+
+        # Agent Query Pipeline
+        self.qp = self.get_query_pipeline()
+
+    # https://docs.llamaindex.ai/en/stable/examples/agent/agent_runner/query_pipeline_agent/?h=sql+agent#setup-simple-retry-agent-pipeline-for-text-to-sql
+
+    def agent_input_fn(self, state: Dict[str, Any]) -> Dict:
+        """Agent input function."""
+        task = state["task"]
+        if "convo_history" not in state:
+            state["convo_history"] = []
+        state["convo_history"].append(f"User: {task.input}")
+        convo_history_str = "\n".join(state["convo_history"]) or "None"
+        logger.info("Agent input FN")
+        logger.info(task.input)
+        logger.info("Agent input FN")
+        return {"input": task.input, "convo_history": convo_history_str}
+
+    # Retry Prompt.
+    def retry_prompt_str_fn(self) -> str:
+        retry_prompt_str = """\
+        You are trying to generate a proper natural language query given a user input.
+
+        This query will then be interpreted by a downstream text-to-SQL agent which
+        will convert the query to a SQL statement. If the agent triggers an error,
+        then that will be reflected in the current conversation history (see below).
+
+        If the conversation history is None, use the user input. If its not None,
+        generate a new SQL query that avoids the problems of the previous SQL query.
+
+        Input: {input}
+        Convo history (failed attempts): 
+        {convo_history}
+
+        New input: """
+
+        return retry_prompt_str
+
+    def validate_prompt_str_fn(self) -> str:
+        validate_prompt_str = """\
+        Given the user query, validate whether the inferred SQL query and response from executing the query is correct and answers the query.
+
+        Answer with YES or NO.
+
+        Query: {input}
+        Inferred SQL query: {sql_query}
+        SQL Response: {sql_response}
+
+        Result: """
+        return validate_prompt_str
+
+    def agent_output_fn(
+        self, state: Dict[str, Any], output: Response
+    ) -> Tuple[AgentChatResponse, bool]:
+        """Agent output component."""
+
+        task = state["task"]
+        print(f"> Inferred SQL Query: {output.metadata['sql_query']}")
+        print(f"> SQL Response: {str(output)}")
+        state["convo_history"].append(
+            f"Assistant (inferred SQL query): {output.metadata['sql_query']}"
         )
+        state["convo_history"].append(f"Assistant (response): {str(output)}")
 
-        # Setup ReAct output parser
-        self.parse_react_output = AgentFnComponent(fn=self.parse_react_output_fn)
-
-        # Setup Run Tools
-        self.run_tool = AgentFnComponent(fn=self.run_tool_fn)
-
-        # Setup process_response
-        self.process_response = AgentFnComponent(fn=self.process_response_fn)
-
-        # Setup agent process_response
-        self.process_agent_response = AgentFnComponent(
-            fn=self.process_agent_response_fn
-        )
-
-        # Query Pipeline
-        self.qp = self.get_qp()
-
-    def agent_input_fn(self, task: Task, state: Dict[str, Any]) -> Dict[str, Any]:
-        """Agent input function.
-
-        Returns:
-            A Dictionary of output keys and values. If you are specifying
-            src_key when defining links between this component and other
-            components, make sure the src_key matches the specified output_key.
-
-        """
-        # initialize current_reasoning
-        if "current_reasoning" not in state:
-            state["current_reasoning"] = []
-        reasoning_step = ObservationReasoningStep(observation=task.input)
-        state["current_reasoning"].append(reasoning_step)
-        return {"input": task.input}
-
-    def react_prompt_fn(
-        self, task: Task, state: Dict[str, Any], input: str, tools: List[BaseTool]
-    ) -> List[ChatMessage]:
-        # Add input to reasoning
-        chat_formatter = ReActChatFormatter()
-        return chat_formatter.format(
-            tools,
-            chat_history=task.memory.get() + state["memory"].get_all(),
-            current_reasoning=state["current_reasoning"],
-        )
-
-    def parse_react_output_fn(
-        self, task: Task, state: Dict[str, Any], chat_response: ChatResponse
-    ):
-        """Parse ReAct output into a reasoning step."""
-        output_parser = ReActOutputParser()
-        reasoning_step = output_parser.parse(chat_response.message.content)
-        return {"done": reasoning_step.is_done, "reasoning_step": reasoning_step}
-
-    def run_tool_fn(
-        self, task: Task, state: Dict[str, Any], reasoning_step: ActionReasoningStep
-    ):
-        """Run tool and process tool output."""
-        tool_runner_component = ToolRunnerComponent(
-            self.tools, callback_manager=task.callback_manager
-        )
-        tool_output = tool_runner_component.run_component(
-            tool_name=reasoning_step.action,
-            tool_input=reasoning_step.action_input,
-        )
-        observation_step = ObservationReasoningStep(observation=str(tool_output))
-        state["current_reasoning"].append(observation_step)
-        # TODO: get output
-        print(observation_step.get_content())
-        return {"response_str": observation_step.get_content(), "is_done": False}
-
-    def process_response_fn(
-        self, task: Task, state: Dict[str, Any], response_step: ResponseReasoningStep
-    ):
-        """Process response."""
-        state["current_reasoning"].append(response_step)
-        response_str = response_step.response
-        # Now that we're done with this step, put into memory
-        state["memory"].put(ChatMessage(content=task.input, role=MessageRole.USER))
-        state["memory"].put(
-            ChatMessage(content=response_str, role=MessageRole.ASSISTANT)
-        )
-
-        return {"response_str": response_str, "is_done": True}
-
-    def process_agent_response_fn(
-        self, task: Task, state: Dict[str, Any], response_dict: dict
-    ):
-        """Process agent response."""
-        return (
-            AgentChatResponse(response_dict["response_str"]),
-            response_dict["is_done"],
-        )
-
-    def get_qp(self):
-        qp = QueryPipeline(verbose=True)
-
-        qp.add_modules(
-            {
-                "agent_input": self.agent_input_component,
-                "react_prompt": self.react_prompt_component,
-                "llm": Settings.llm,
-                "react_output_parser": self.parse_react_output,
-                "run_tool": self.run_tool,
-                "process_response": self.process_response,
-                "process_agent_response": self.process_agent_response,
+        # run a mini chain to get response
+        validate_prompt_partial = self.validate_prompt.as_query_component(
+            partial={
+                "sql_query": output.metadata["sql_query"],
+                "sql_response": str(output),
             }
         )
-        # link input to react prompt to parsed out response (either tool action/input or observation)
-        qp.add_chain(["agent_input", "react_prompt", "llm", "react_output_parser"])
+        qp = QP(chain=[validate_prompt_partial, Settings.llm])
+        validate_output = qp.run(input=task.input)
 
-        # add conditional link from react output to tool call (if not done)
-        qp.add_link(
-            "react_output_parser",
-            "run_tool",
-            condition_fn=lambda x: not x["done"],
-            input_fn=lambda x: x["reasoning_step"],
-        )
-        # add conditional link from react output to final response processing (if done)
-        qp.add_link(
-            "react_output_parser",
-            "process_response",
-            condition_fn=lambda x: x["done"],
-            input_fn=lambda x: x["reasoning_step"],
+        state["count"] += 1
+        is_done = False
+        if state["count"] >= self.max_iter:
+            is_done = True
+        if "YES" in validate_output.message.content:
+            is_done = True
+
+        return str(output), is_done
+
+    def get_query_pipeline(self):
+        """Create Retry Agent Query Pipeline"""
+        qp = QP(
+            modules={
+                "input": self.agent_input,
+                "retry_prompt": self.retry_prompt,
+                "llm": Settings.llm,
+                "sql_query_engine": self.sql_query_engine,
+                "output_component": self.agent_output,
+            },
+            verbose=True,
         )
 
-        # whether response processing or tool output processing, add link to final agent response
-        qp.add_link("process_response", "process_agent_response")
-        qp.add_link("run_tool", "process_agent_response")
+        qp.add_link(
+            "input", "retry_prompt", dest_key="input", input_fn=lambda x: x["input"]
+        )
+        qp.add_link(
+            "input",
+            "retry_prompt",
+            dest_key="convo_history",
+            input_fn=lambda x: x["convo_history"],
+        )
+
+        qp.add_chain(["retry_prompt", "llm"])
+
+        qp.add_link("llm", "sql_query_engine", dest_key="query_str")
+
+        qp.add_chain(["sql_query_engine", "output_component"])
 
         return qp
 

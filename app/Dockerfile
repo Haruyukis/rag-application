@@ -1,6 +1,6 @@
 FROM dustynv/llama-index:r35.4.1
 
-WORKDIR app
+WORKDIR /app
 
 COPY . .
 

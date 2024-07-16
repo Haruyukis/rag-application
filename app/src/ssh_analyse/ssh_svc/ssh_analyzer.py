@@ -93,14 +93,14 @@ class SshAnalyzer:
 
     def run(self, query_str: str):
         """Generate an answer to the query_str."""
-        whitelist = ""
+        whitelist = []
         with open(file="./data/log/whitelisteduser.txt", mode="r") as f:
             for line in f:
-                whitelist += line + "\n"
-        whitelist_template = (
-            "Here are the user that are allowed to log in:\n" + whitelist
-        )
-        return self.qp.run(query=query_str + "\n" + whitelist_template).message.content
+                whitelist.append(line)
+        whitelist_template = "Here are the authorized user:\n" + str(
+            whitelist
+        )  # TODO, ça n'a pas l'air de marcher, je pense que le meilleur moyen serait d'avoir une table whitelist. DONC à ne pas traiter à priori car il suffit de générer les trucs avec le LLM.
+        return self.qp.run(query=query_str + "\n" + whitelist_template)[0].get_content()
 
     def get_table_context_and_rows_str(
         self, query_str: str, strtable_schema_objs: List[SQLTableSchema]
@@ -188,6 +188,7 @@ class SshAnalyzer:
         response_synthesis_prompt = PromptTemplate(
             response_synthesis_prompt_str,
         )
+
         return response_synthesis_prompt
 
     def get_query_pipeline(self):
@@ -200,8 +201,8 @@ class SshAnalyzer:
                 "text2sql_llm": Settings.llm,
                 "sql_output_parser": self.sql_parser_component,
                 "sql_retriever": self.sql_retriever,
-                "response_synthesis_prompt": self.response_synthesis_prompt,
-                "response_synthesis_llm": Settings.llm,
+                # "response_synthesis_prompt": self.response_synthesis_prompt,
+                # "response_synthesis_llm": Settings.llm,
             },
             verbose=True,
         )
@@ -217,13 +218,13 @@ class SshAnalyzer:
         qp.add_chain(
             ["text2sql_prompt", "text2sql_llm", "sql_output_parser", "sql_retriever"]
         )
-        qp.add_link(
-            "sql_output_parser", "response_synthesis_prompt", dest_key="sql_query"
-        )
-        qp.add_link(
-            "sql_retriever", "response_synthesis_prompt", dest_key="context_str"
-        )
-        qp.add_link("input", "response_synthesis_prompt", dest_key="query_str")
-        qp.add_link("response_synthesis_prompt", "response_synthesis_llm")
+        # qp.add_link(
+        # "sql_output_parser", "response_synthesis_prompt", dest_key="sql_query"
+        # )
+        # qp.add_link(
+        # "sql_retriever", "response_synthesis_prompt", dest_key="context_str"
+        # )
+        # qp.add_link("input", "response_synthesis_prompt", dest_key="query_str")
+        # qp.add_link("response_synthesis_prompt", "response_synthesis_llm")
 
         return qp
