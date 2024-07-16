@@ -1,9 +1,8 @@
-from llama_index.core import Settings, SQLDatabase
+from llama_index.core import Settings
 from llama_index.core.callbacks import CallbackManager
 from llama_index.llms.ollama import Ollama
 from llama_index.core.llms import ChatMessage, ChatResponse
-from llama_index.core.tools import QueryEngineTool, BaseTool
-from llama_index.core.indices.struct_store.sql_query import SQLTableRetrieverQueryEngine
+from llama_index.core.tools import BaseTool
 from llama_index.core.chat_engine.types import AgentChatResponse
 from llama_index.core.tools import FunctionTool
 
@@ -30,31 +29,9 @@ from llama_index.core.agent import (
 from llama_index.core.agent.react.output_parser import ReActOutputParser
 
 from typing import Dict, Any, List
-from sqlalchemy import Column, MetaData, String, create_engine
+
 from src.ssh_analyse.ssh_svc.ssh_analyzer import SshAnalyzer
 from src.config import ollama_base_url
-from app.src.ssh_analyse.ssh_svc.helpers import (
-    create_table_from_data,
-    index_all_tables,
-    structuring_table,
-    object_indexing,
-)
-
-from llama_index.core.query_engine import CustomQueryEngine
-from llama_index.core.retrievers import BaseRetriever
-from llama_index.core import get_response_synthesizer
-from llama_index.core.response_synthesizers import BaseSynthesizer
-
-
-class RAGStringQueryEngine(CustomQueryEngine):
-    """RAG String Query Engine."""
-
-    qp: QueryPipeline
-
-    def custom_query(self, query_str: str) -> str:
-        response = self.qp.run(query_str)
-
-        return str(response.message.content)
 
 
 class SshAgent:
@@ -217,20 +194,3 @@ class SshAgent:
         )
         response = agent.chat(user_query)
         return response
-
-    """
-    def print_chat_formatter(self):
-        chat_formatter = ReActChatFormatter()
-        msgs = chat_formatter.format(
-            self.vector_tools + [self.sql_tool], chat_history=[], current_reasoning=[]
-        )
-        return msgs
-    """
-
-    """
-    def react_agent(self, user_query: str):
-        agent = ReActAgent.from_tools(
-            [self.sql_tool] + self.vector_tools, llm=Settings.llm, verbose=True
-        )
-        return agent.chat(user_query)
-    """

@@ -18,6 +18,7 @@ from llama_index.llms.ollama import Ollama
 
 from sqlalchemy import create_engine, MetaData, Column, String
 from typing import List
+from loguru import logger
 
 from src.helpers.create_table import create_table_from_data
 from src.config import ollama_base_url
@@ -90,9 +91,16 @@ class SshAnalyzer:
         # QP
         self.qp = self.get_query_pipeline()
 
-    def run(self, user_query: str):
-        """Generate an answer to the user_query."""
-        return self.qp.run(query=user_query).message.content
+    def run(self, query_str: str):
+        """Generate an answer to the query_str."""
+        whitelist = ""
+        with open(file="./data/log/whitelisteduser.txt", mode="r") as f:
+            for line in f:
+                whitelist += line + "\n"
+        whitelist_template = (
+            "Here are the user that are allowed to log in:\n" + whitelist
+        )
+        return self.qp.run(query=query_str + "\n" + whitelist_template).message.content
 
     def get_table_context_and_rows_str(
         self, query_str: str, strtable_schema_objs: List[SQLTableSchema]
@@ -139,6 +147,8 @@ class SshAnalyzer:
         return response.strip().strip("```").strip()
 
     def get_text2sql_prompt_template(self):
+        """Text2SQL Prompting"""
+
         text2sql_prompt_str = """\
         Given an input question, first create a syntactically correct {dialect} query to run, then look at the results of the query and return the answer.
         Pay attention to use only the column names that you can see in the schema description. Be careful to not query for columns that do not exist. Pay attention to which column is in which table. Also, qualify column names with the table name when needed. You are required to use the following format, each taking one line:
