@@ -22,6 +22,7 @@ from src.config import ollama_base_url
 
 from pathlib import Path
 import json, os
+from loguru import logger
 
 
 def structuring_table(table_names):
@@ -51,7 +52,10 @@ def structuring_table(table_names):
             # Loading
             table_info = TableInfo.parse_file(Path(f"{table_name}.json"))
         else:
+            logger.info("Completing the value")
             table_info = program(table_name=table_name)
+            logger.info("Program worked")
+
             # Storing:
             out_file = f"{table_name}.json"
             json.dump(table_info.dict(), open(out_file, "w"))
