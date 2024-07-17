@@ -28,6 +28,9 @@ services:
     networks:
       - my-network
 
+    volumes:
+      - ./app:/app # TODO A retirer à la fin, quand j'aurais fini de developper, permis de changer le code du container directement depuis vscode.
+
 networks:
   my-network:
     driver: bridge
