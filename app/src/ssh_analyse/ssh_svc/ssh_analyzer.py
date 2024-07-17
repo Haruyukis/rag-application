@@ -135,6 +135,7 @@ class SshAnalyzer:
     def parse_response_to_sql(self, response: ChatResponse) -> str:
         """Parse response to SQL."""
         response = response.message.content
+        response_str = str(response)
         sql_query_start = response.find("SQLQuery:")
         if sql_query_start != -1:
             response = response[sql_query_start:]
@@ -144,7 +145,11 @@ class SshAnalyzer:
         sql_result_start = response.find("SQLResult:")
         if sql_result_start != -1:
             response = response[:sql_result_start]
-        return response.strip().strip("```").strip()
+        sql_query = response.strip().strip("```").strip()
+        if sql_query[-1] == ";":
+            sql_query = sql_query[:-1]
+        self.sql_query = sql_query
+        return sql_query
 
     def get_text2sql_prompt_template(self):
         """Text2SQL Prompting"""
@@ -228,3 +233,7 @@ class SshAnalyzer:
         # qp.add_link("response_synthesis_prompt", "response_synthesis_llm")
 
         return qp
+
+    def get_sql_query(self):
+        """Getter for sql_query"""
+        return self.sql_query

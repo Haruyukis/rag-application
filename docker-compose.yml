@@ -29,7 +29,7 @@ services:
       - my-network
 
     volumes:
-      - ./app/src:/app/src # TODO A retirer à la fin, quand j'aurais fini de developper, permis de changer le code du container directement depuis vscode.
+      - ./app:/app # TODO A retirer à la fin, quand j'aurais fini de developper, permis de changer le code du container directement depuis vscode.
 
 networks:
   my-network:
