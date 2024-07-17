@@ -18,7 +18,6 @@ from llama_index.llms.ollama import Ollama
 
 from sqlalchemy import create_engine, MetaData, Column, String
 from typing import List
-from loguru import logger
 
 from src.helpers.create_table import create_table_from_data
 from src.config import ollama_base_url
@@ -134,18 +133,17 @@ class SshAnalyzer:
 
     def parse_response_to_sql(self, response: ChatResponse) -> str:
         """Parse response to SQL."""
-        response = response.message.content
-        response_str = str(response)
-        sql_query_start = response.find("SQLQuery:")
+        answer: str = str(response.message.content)
+        sql_query_start = answer.find("SQLQuery:")
         if sql_query_start != -1:
-            response = response[sql_query_start:]
+            answer = answer[sql_query_start:]
             # TODO: move to removeprefix after Python 3.9+
-            if response.startswith("SQLQuery:"):
-                response = response[len("SQLQuery:") :]
-        sql_result_start = response.find("SQLResult:")
+            if answer.startswith("SQLQuery:"):
+                answer = answer[len("SQLQuery:") :]
+        sql_result_start = answer.find("Answer:")
         if sql_result_start != -1:
-            response = response[:sql_result_start]
-        sql_query = response.strip().strip("```").strip()
+            answer = answer[:sql_result_start]
+        sql_query = answer.strip().strip("```").strip()
         if sql_query[-1] == ";":
             sql_query = sql_query[:-1]
         self.sql_query = sql_query
