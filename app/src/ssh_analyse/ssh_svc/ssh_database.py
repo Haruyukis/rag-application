@@ -26,7 +26,15 @@ class SshDatabase:
             model="llama3", request_timeout=600.0, base_url=ollama_base_url
         )
 
-        self.llm = Ollama(
+        self.llm1 = Ollama(
+            model="llama3", request_timeout=1200.0, base_url=ollama_base_url
+        )
+
+        self.llm2 = Ollama(
+            model="gemma2", request_timeout=600.0, base_url=ollama_base_url
+        )
+
+        self.llm3 = Ollama(
             model="llama3", request_timeout=600.0, base_url=ollama_base_url
         )
 
@@ -49,7 +57,13 @@ class SshDatabase:
         self.python_parser_component = FnComponent(self.parse_response_to_python)
 
         # Table Insertion PromptTemplate
-        self.table_insert_prompt = self.get_table_insert_prompt_template()
+        self.table_insert_prompt = (
+            self.get_table_insert_prompt_template().partial_format(
+                path=f"./app/{folder_path}/auth.log"
+            )
+        )
+
+        self.python_parser_prompt = FnComponent(self.python_parser_prompt_fn)
 
         # Query Pipeline
         self.query_pipeline = self.get_query_pipeline()
@@ -75,7 +89,7 @@ class SshDatabase:
         """Create a Prompt Template for Table generation"""
 
         table_creation_prompt_str = """\
-        Given an input question, generate SQL tables with their attributes needed to answer to the question using python and SQLAlchemy. You are required to use the following format, each taking one line:
+        Given an input question, generate SQL tables with their attributes needed to answer to the question using python and SQLAlchemy. Focus only on the table creation. You are required to use the following format, each taking one line:
         Question: Question here
         Python Code: Python Code here
         Answer: Final answer here
@@ -111,12 +125,23 @@ class SshDatabase:
         self.python_query = python_query
         return python_query
 
+    def python_parser_prompt_fn(self, response: str):
+        """Python Parsing"""
+
+        python_parser_prompt_str = f"""\
+        PRINT ONLY THE PYTHON CODE. You are required to not change the python code.
+        Here is the python code:
+        {response}
+
+        """
+        return PromptTemplate(python_parser_prompt_str)
+
     def get_table_insert_prompt_template(self):
         """Create a Prompt Template for Table Insertion"""
         logger.info("Starting Table Insertion...")
 
         table_insert_prompt_str = """\
-        Given an input question, complete the python code with a syntactically correct code to insert the rows from the file `./app/data/log/auth.log` in the database. You are required to use the following format, each taking one line:
+        Given an input question and a python code, complete the python code with a syntactically correct code to insert the rows of {path} in the database. First, you will generate a regex pattern to get the values to insert, then insert in the database. Focus only on the insertion. You are required to use the following format, each taking one line:
 
         Question: Question here
         Python Code: Python Code to Complete
@@ -132,6 +157,8 @@ class SshDatabase:
         
         """
         table_insert_prompt = PromptTemplate(table_insert_prompt_str)
+        logger.info("Starting Table Insertion...")
+
         return table_insert_prompt
 
     def get_query_pipeline(self):
@@ -142,10 +169,12 @@ class SshDatabase:
                 "input": InputComponent(),
                 "process_retriever": self.process_retriever_component,
                 "table_creation_prompt": self.table_creation_prompt,
-                "llm1": self.llm,
+                "llm1": self.llm1,
                 "python_output_parser": self.python_parser_component,
                 "table_insert_prompt": self.table_insert_prompt,
-                "llm2": self.llm,
+                "llm2": self.llm2,
+                "python_parser_prompt": self.python_parser_prompt,
+                "llm3": self.llm3,
             },
             verbose=True,
         )
@@ -164,6 +193,6 @@ class SshDatabase:
         qp.add_link(
             "python_output_parser", "table_insert_prompt", dest_key="python_code"
         )
-        qp.add_chain(["table_insert_prompt", "llm2"])
+        qp.add_chain(["table_insert_prompt", "llm2", "python_parser_prompt", "llm3"])
 
         return qp
