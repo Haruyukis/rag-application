@@ -27,15 +27,11 @@ class SshDatabase:
         )
 
         self.llm1 = Ollama(
-            model="llama3", request_timeout=1200.0, base_url=ollama_base_url
+            model="llama3", request_timeout=600.0, base_url=ollama_base_url
         )
 
         self.llm2 = Ollama(
-            model="gemma2", request_timeout=600.0, base_url=ollama_base_url
-        )
-
-        self.llm3 = Ollama(
-            model="llama3", request_timeout=600.0, base_url=ollama_base_url
+            model="gemma2", request_timeout=1200.0, base_url=ollama_base_url
         )
 
         Settings.callback_manager = CallbackManager()
@@ -63,8 +59,6 @@ class SshDatabase:
             )
         )
 
-        self.python_parser_prompt = FnComponent(self.python_parser_prompt_fn)
-
         # Query Pipeline
         self.query_pipeline = self.get_query_pipeline()
 
@@ -90,17 +84,17 @@ class SshDatabase:
 
         table_creation_prompt_str = """\
         Given an input question, generate SQL tables with their attributes needed to answer to the question using python and SQLAlchemy. Focus only on the table creation. You are required to use the following format, each taking one line:
-        Question: Question here
-        Python Code: Python Code here
-        Answer: Final answer here
+        **Question**: Question here
+        **Python Code**: Python Code here
+        **Answer**: Final answer here
 
 
 
         Here are some examples of logs.
         {retrieved_nodes}
 
-        Question: {query_str}
-        Python Code:
+        **Question**: {query_str}
+        **Python Code**:
         
         """
         table_creation_prompt = PromptTemplate(table_creation_prompt_str)
@@ -108,56 +102,46 @@ class SshDatabase:
         return table_creation_prompt
 
     def parse_response_to_python(self, response: ChatResponse) -> str:
-        """Parse response to SQL"""
+        """Parse response to Python"""
         logger.info("Table Creation Done...")
         logger.info("Reading the python code generated")
         response = response.message.content
-        python_query_start = response.find("Python Code:")
+        python_query_start = response.find("**Python Code**:")
         if python_query_start != -1:
             response = response[python_query_start:]
             # TODO: move to removeprefix after Python 3.9+
-            if response.startswith("Python Code:"):
-                response = response[len("Python Code:") :]
-        answer = response.find("Answer:")
+            if response.startswith("**Python Code**:"):
+                response = response[len("**Python Code**:") :]
+        answer = response.find("**Answer**:")
         if answer != -1:
             response = response[:answer]
+
         python_query = response.strip().strip("```").strip()
         self.python_query = python_query
         return python_query
-
-    def python_parser_prompt_fn(self, response: str):
-        """Python Parsing"""
-
-        python_parser_prompt_str = f"""\
-        PRINT ONLY THE PYTHON CODE. You are required to not change the python code.
-        Here is the python code:
-        {response}
-
-        """
-        return PromptTemplate(python_parser_prompt_str)
 
     def get_table_insert_prompt_template(self):
         """Create a Prompt Template for Table Insertion"""
         logger.info("Starting Table Insertion...")
 
         table_insert_prompt_str = """\
-        Given an input question and a python code, complete the python code with a syntactically correct code to insert the rows of {path} in the database. First, you will generate a regex pattern to get the values to insert, then insert in the database. Focus only on the insertion. You are required to use the following format, each taking one line:
+        Given an input question and a python code, complete the python code with a syntactically correct code to insert the rows of {path} in the database. Focus only on the insertion. You are required to use the following format, each taking one line:
 
-        Question: Question here
-        Python Code: Python Code to Complete
-        Answer: Final answer here
+        **Question**: Question here
+        **Regex**: Regex Pattern here
+        **Python Code**: Python Code to complete
+        **Answer**: Final answer here
 
         Here are some examples of logs that must be inserted.
         {retrieved_nodes}
         
-        Question: {query_str}
-        Python Code: {python_code}
-        Answer:
+        **Question**: {query_str}
+        **Python Code**: {python_code}
+        **Answer**:
 
         
         """
         table_insert_prompt = PromptTemplate(table_insert_prompt_str)
-        logger.info("Starting Table Insertion...")
 
         return table_insert_prompt
 
@@ -173,8 +157,7 @@ class SshDatabase:
                 "python_output_parser": self.python_parser_component,
                 "table_insert_prompt": self.table_insert_prompt,
                 "llm2": self.llm2,
-                "python_parser_prompt": self.python_parser_prompt,
-                "llm3": self.llm3,
+                "python_output_parser1": self.python_parser_component,
             },
             verbose=True,
         )
@@ -186,6 +169,7 @@ class SshDatabase:
         )
 
         qp.add_chain(["table_creation_prompt", "llm1", "python_output_parser"])
+
         qp.add_link("input", "table_insert_prompt", dest_key="query_str")
         qp.add_link(
             "process_retriever", "table_insert_prompt", dest_key="retrieved_nodes"
@@ -193,6 +177,6 @@ class SshDatabase:
         qp.add_link(
             "python_output_parser", "table_insert_prompt", dest_key="python_code"
         )
-        qp.add_chain(["table_insert_prompt", "llm2", "python_parser_prompt", "llm3"])
+        qp.add_chain(["table_insert_prompt", "llm2", "python_output_parser1"])
 
         return qp
