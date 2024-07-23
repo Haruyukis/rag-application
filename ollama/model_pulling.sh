@@ -8,4 +8,4 @@ ollama pull llama3
 
 ollama pull gemma2
 
-ollama run llama3 &
+ollama pull codegemma

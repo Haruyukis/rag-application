@@ -16,7 +16,7 @@ from llama_index.embeddings.huggingface import HuggingFaceEmbedding
 from llama_index.llms.ollama import Ollama
 
 
-from sqlalchemy import create_engine, MetaData, Column, String
+from sqlalchemy import create_engine, MetaData, Column, String, Integer
 from typing import List
 from loguru import logger
 
@@ -35,7 +35,7 @@ class SshAnalyzer:
     def __init__(self, path: str):
         """Constructor"""
         # Init
-        self.engine = create_engine("sqlite:///ssh_log.db")
+        self.engine = create_engine("sqlite:///logins.db")
         self.sql_database = SQLDatabase(self.engine)
 
         Settings.embed_model = HuggingFaceEmbedding(model_name="BAAI/bge-base-en-v1.5")
@@ -46,23 +46,17 @@ class SshAnalyzer:
 
         # Create Table from Data
         self.metadata_obj = MetaData()
-        self.table_names = ["successful_logins", "failed_logins"]
+        self.table_names = ["failed_logins"]
         self.columns = [
             [
+                Column("id", Integer),
                 Column("user", String),
-                Column("login_time", String),
-                Column("log_message", String),
-            ],
-            [
-                Column("user", String),
-                Column("attempt_time", String),
-                Column("log_message", String),
-            ],
+            ]
         ]
 
-        create_table_from_data(
-            path, self.table_names, self.metadata_obj, self.columns, self.engine
-        )
+        # create_table_from_data(
+        #     path, self.table_names, self.metadata_obj, self.columns, self.engine
+        # )
 
         # Structured Retrieval Metadata
         self.table_infos = structuring_table(table_names=self.table_names)
@@ -108,7 +102,7 @@ class SshAnalyzer:
         """Get table context string."""
 
         context_strs = []
-        vector_index_dict = index_all_tables(self.sql_database)
+        vector_index_dict = index_all_tables(self.sql_database, self.table_names)
 
         for table_schema_obj in strtable_schema_objs:
             table_info = self.sql_database.get_single_table_info(
