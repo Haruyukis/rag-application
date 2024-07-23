@@ -14,7 +14,7 @@ from llama_index.embeddings.huggingface import HuggingFaceEmbedding
 from llama_index.llms.ollama import Ollama
 from llama_index.core.callbacks import CallbackManager
 
-from typing import Dict
+from typing import Dict, List
 from sqlalchemy import text
 
 from src.ssh_analyse.ssh_model import TableInfo
@@ -82,7 +82,9 @@ def object_indexing(engine, table_infos):
 
 
 def index_all_tables(
-    sql_database: SQLDatabase, table_index_dir: str = "table_index_dir"
+    sql_database: SQLDatabase,
+    table_names: List[str],
+    table_index_dir: str = "table_index_dir",
 ) -> Dict[str, VectorStoreIndex]:
     """Index all tables."""
 
@@ -94,10 +96,9 @@ def index_all_tables(
     vector_index_dict = {}
     engine = sql_database.engine
 
-    for table_name in [
-        "successful_logins",
-        "failed_logins",
-    ]:  # Look why it doesn't work sql_database.get_usable_table_names()
+    for (
+        table_name
+    ) in table_names:  # Look why it doesn't work sql_database.get_usable_table_names()
         print(f"Indexing rows in table: {table_name}")
 
         if not os.path.exists(f"{table_index_dir}/{table_name}"):

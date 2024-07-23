@@ -16,8 +16,9 @@ from llama_index.embeddings.huggingface import HuggingFaceEmbedding
 from llama_index.llms.ollama import Ollama
 
 
-from sqlalchemy import create_engine, MetaData, Column, String
+from sqlalchemy import create_engine, MetaData, Column, String, Integer
 from typing import List
+from loguru import logger
 
 from src.helpers.create_table import create_table_from_data
 from src.config import ollama_base_url
@@ -34,7 +35,7 @@ class SshAnalyzer:
     def __init__(self, path: str):
         """Constructor"""
         # Init
-        self.engine = create_engine("sqlite:///ssh_log.db")
+        self.engine = create_engine("sqlite:///logins.db")
         self.sql_database = SQLDatabase(self.engine)
 
         Settings.embed_model = HuggingFaceEmbedding(model_name="BAAI/bge-base-en-v1.5")
@@ -45,23 +46,17 @@ class SshAnalyzer:
 
         # Create Table from Data
         self.metadata_obj = MetaData()
-        self.table_names = ["successful_logins", "failed_logins"]
+        self.table_names = ["failed_logins"]
         self.columns = [
             [
+                Column("id", Integer),
                 Column("user", String),
-                Column("login_time", String),
-                Column("log_message", String),
-            ],
-            [
-                Column("user", String),
-                Column("attempt_time", String),
-                Column("log_message", String),
-            ],
+            ]
         ]
 
-        create_table_from_data(
-            path, self.table_names, self.metadata_obj, self.columns, self.engine
-        )
+        # create_table_from_data(
+        #     path, self.table_names, self.metadata_obj, self.columns, self.engine
+        # )
 
         # Structured Retrieval Metadata
         self.table_infos = structuring_table(table_names=self.table_names)
@@ -107,7 +102,7 @@ class SshAnalyzer:
         """Get table context string."""
 
         context_strs = []
-        vector_index_dict = index_all_tables(self.sql_database)
+        vector_index_dict = index_all_tables(self.sql_database, self.table_names)
 
         for table_schema_obj in strtable_schema_objs:
             table_info = self.sql_database.get_single_table_info(
@@ -133,17 +128,18 @@ class SshAnalyzer:
 
     def parse_response_to_sql(self, response: ChatResponse) -> str:
         """Parse response to SQL."""
-        answer: str = str(response.message.content)
-        sql_query_start = answer.find("SQLQuery:")
+        response = response.message.content
+        response_str = str(response)
+        sql_query_start = response.find("SQLQuery:")
         if sql_query_start != -1:
-            answer = answer[sql_query_start:]
+            response = response[sql_query_start:]
             # TODO: move to removeprefix after Python 3.9+
-            if answer.startswith("SQLQuery:"):
-                answer = answer[len("SQLQuery:") :]
-        sql_result_start = answer.find("Answer:")
+            if response.startswith("SQLQuery:"):
+                response = response[len("SQLQuery:") :]
+        sql_result_start = response.find("SQLResult:")
         if sql_result_start != -1:
-            answer = answer[:sql_result_start]
-        sql_query = answer.strip().strip("```").strip()
+            response = response[:sql_result_start]
+        sql_query = response.strip().strip("```").strip()
         if sql_query[-1] == ";":
             sql_query = sql_query[:-1]
         self.sql_query = sql_query
