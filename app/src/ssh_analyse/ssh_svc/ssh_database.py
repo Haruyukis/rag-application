@@ -64,7 +64,6 @@ class SshDatabase:
 
     def run(self):
         """Answer generation"""
-
         logger.info(f"Input: {self.user_query}")
         logger.info("Running the query pipeline...")
         return self.query_pipeline.run(query=self.user_query)
@@ -83,7 +82,8 @@ class SshDatabase:
         """Create a Prompt Template for Table generation"""
 
         table_creation_prompt_str = """\
-        Given an input question, generate SQL tables with their attributes needed to answer to the question using python and SQLAlchemy. Focus only on the table creation. You are required to use the following format, each taking one line:
+        Given an input question and a python code, complete the python code by generating only SQL tables with their attributes needed to answer to the question. Pay only attention to the table creation. You are required to use the following format, each taking one line:
+
         **Question**: Question here
         **Python Code**: Python Code here
         **Answer**: Final answer here
@@ -94,7 +94,16 @@ class SshDatabase:
         {retrieved_nodes}
 
         **Question**: {query_str}
-        **Python Code**:
+        **Python Code**: '''\
+        from sqlalchemy import Column, Integer, String
+        from sqlalchemy.ext.declarative import declarative_base
+        from sqlalchemy.orm import sessionmaker
+        from sqlalchemy import create_engine
+
+        # Engine
+        engine = create_engine("sqlite:///logs.db")
+        Base = declarative_base()'''
+        
         
         """
         table_creation_prompt = PromptTemplate(table_creation_prompt_str)
@@ -117,7 +126,9 @@ class SshDatabase:
             response = response[:answer]
 
         python_query = response.strip().strip("```").strip()
-        self.python_query = python_query
+        if python_query.startswith("python\\n"):
+            python_query = python_query[len("python\\n") :]
+
         return python_query
 
     def get_table_insert_prompt_template(self):
@@ -125,16 +136,15 @@ class SshDatabase:
         logger.info("Starting Table Insertion...")
 
         table_insert_prompt_str = """\
-        Given an input question and a python code, complete the python code with a syntactically correct code to insert the rows of {path} in the database. Focus only on the insertion. You are required to use the following format, each taking one line:
+        Given an input question and a python code, complete the python code with a syntactically correct code to insert the rows of {path} in the database using regex. Pay attention only on the insertion. You are required to use the following format, each taking one line:
 
         **Question**: Question here
-        **Regex**: Regex Pattern here
-        **Python Code**: Python Code to complete
+        **Python Code**: Python Code here
         **Answer**: Final answer here
 
         Here are some examples of logs that must be inserted.
         {retrieved_nodes}
-        
+
         **Question**: {query_str}
         **Python Code**: {python_code}
         **Answer**:
@@ -155,9 +165,9 @@ class SshDatabase:
                 "table_creation_prompt": self.table_creation_prompt,
                 "llm1": self.llm1,
                 "python_output_parser": self.python_parser_component,
-                "table_insert_prompt": self.table_insert_prompt,
-                "llm2": self.llm2,
-                "python_output_parser1": self.python_parser_component,
+                # "table_insert_prompt": self.table_insert_prompt,
+                # "llm2": self.llm2,
+                # "python_output_parser1": self.python_parser_component,
             },
             verbose=True,
         )
@@ -170,13 +180,13 @@ class SshDatabase:
 
         qp.add_chain(["table_creation_prompt", "llm1", "python_output_parser"])
 
-        qp.add_link("input", "table_insert_prompt", dest_key="query_str")
-        qp.add_link(
-            "process_retriever", "table_insert_prompt", dest_key="retrieved_nodes"
-        )
-        qp.add_link(
-            "python_output_parser", "table_insert_prompt", dest_key="python_code"
-        )
-        qp.add_chain(["table_insert_prompt", "llm2", "python_output_parser1"])
+        # qp.add_link("input", "table_insert_prompt", dest_key="query_str")
+        # qp.add_link(
+        #     "process_retriever", "table_insert_prompt", dest_key="retrieved_nodes"
+        # )
+        # qp.add_link(
+        #     "python_output_parser", "table_insert_prompt", dest_key="python_code"
+        # )
+        # qp.add_chain(["table_insert_prompt", "llm2"])
 
         return qp
