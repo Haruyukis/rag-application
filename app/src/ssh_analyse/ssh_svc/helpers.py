@@ -15,13 +15,13 @@ from llama_index.llms.ollama import Ollama
 from llama_index.core.callbacks import CallbackManager
 
 from typing import Dict, List
-from sqlalchemy import text
+from sqlalchemy import text, create_engine, inspect
 
 from src.ssh_analyse.ssh_model import TableInfo
 from src.config import ollama_base_url
 
 from pathlib import Path
-import json, os
+import os
 from loguru import logger
 
 
@@ -35,9 +35,15 @@ def structuring_table(table_names):
 
     prompt_str = """\
     You are given a ssh logs data.
-    Give me a summary of the table only by their name.
+    Give me a summary of the table only by their name and some rows.
     Name:
     {table_name}
+
+    Here are the columns:
+    {columns}
+    
+    Rows Example in the same order as above:
+    {rows}
     Summary:"""
 
     program = LLMTextCompletionProgram.from_defaults(
@@ -48,17 +54,36 @@ def structuring_table(table_names):
     table_infos = []
 
     for table_name in table_names:
-        if os.path.exists(f"{table_name}.json"):
+        if os.path.exists(f"{table_name}.json") and False:  # Remove Loader
             # Loading
             table_info = TableInfo.parse_file(Path(f"{table_name}.json"))
         else:
+            attempts = 0
+            engine = create_engine("sqlite:///logs.db")
+            inspector = inspect(engine)
+            with engine.connect() as conn:
+                results = conn.execute(text(f"SELECT * from {table_name} LIMIT 2"))
+                rows = results.fetchall()
+                columns = inspector.get_columns(table_name)
             logger.info("Completing the value")
-            table_info = program(table_name=table_name)
+            table_info = program(
+                table_name=table_name, rows=str(rows), columns=str(columns)
+            )
+            while attempts < 10:
+                try:
+                    table_info = program(table_name=table_name)
+                    if table_info is not None:
+                        break
+                except:
+                    attempts += 1
+                    logger.info(
+                        f"Program didn't work for the {attempts} time, retrying..."
+                    )
             logger.info("Program worked")
 
             # Storing:
-            out_file = f"{table_name}.json"
-            json.dump(table_info.dict(), open(out_file, "w"))
+            # out_file = f"{table_name}.json"
+            # json.dump(table_info.dict(), open(out_file, "w"))
 
         table_infos.append(table_info)
     return table_infos
@@ -101,7 +126,8 @@ def index_all_tables(
     ) in table_names:  # Look why it doesn't work sql_database.get_usable_table_names()
         print(f"Indexing rows in table: {table_name}")
 
-        if not os.path.exists(f"{table_index_dir}/{table_name}"):
+        if not os.path.exists(f"{table_index_dir}/{table_name}") and True:
+
             with engine.connect() as conn:
                 result = conn.execute(text(f"SELECT * FROM {table_name}"))
                 rows = result.fetchall()
@@ -114,7 +140,7 @@ def index_all_tables(
 
             index = VectorStoreIndex(nodes, show_progress=True)
 
-            index.storage_context.persist(f"{table_index_dir}/{table_name}")
+            # index.storage_context.persist(f"{table_index_dir}/{table_name}") # TODO REMOVE STORAGE
         else:
             storage_context = StorageContext.from_defaults(
                 persist_dir=f"{table_index_dir}/{table_name}"

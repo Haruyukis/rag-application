@@ -2,7 +2,6 @@ from fastapi import FastAPI
 from src.services import generate_response
 from src.ssh_analyse.ssh_svc.main import analyse, database
 
-
 app = FastAPI()
 
 
@@ -22,3 +21,10 @@ def ssh_analyse(user_query: str, path: str):
 def ssh_database(user_query: str, path: str):
     """Query Engine with sentence splitter for auth.log"""
     return database(user_query, path)
+
+
+@app.get("/api/everything")
+def ssh_everything(user_query: str, path: str, file_name: str = ""):
+    """Create the database and analyse"""
+    database(user_query, path)
+    return analyse(user_query, path + "/" + file_name)

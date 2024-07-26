@@ -16,7 +16,7 @@ from llama_index.embeddings.huggingface import HuggingFaceEmbedding
 from llama_index.llms.ollama import Ollama
 
 
-from sqlalchemy import create_engine, MetaData, Column, String, Integer
+from sqlalchemy import create_engine, MetaData, Column, String, Integer, inspect
 from typing import List
 from loguru import logger
 
@@ -35,7 +35,7 @@ class SshAnalyzer:
     def __init__(self, path: str):
         """Constructor"""
         # Init
-        self.engine = create_engine("sqlite:///logins.db")
+        self.engine = create_engine("sqlite:///logs.db")
         self.sql_database = SQLDatabase(self.engine)
 
         Settings.embed_model = HuggingFaceEmbedding(model_name="BAAI/bge-base-en-v1.5")
@@ -45,14 +45,14 @@ class SshAnalyzer:
         Settings.callback_manager = CallbackManager()
 
         # Create Table from Data
-        self.metadata_obj = MetaData()
-        self.table_names = ["failed_logins"]
-        self.columns = [
-            [
-                Column("id", Integer),
-                Column("user", String),
-            ]
-        ]
+        # self.metadata_obj = MetaData()
+        self.table_names = inspect(self.engine).get_table_names()
+        # self.columns = [
+        # [
+        # Column("id", Integer),
+        # Column("user", String),
+        # ]
+        # ]
 
         # create_table_from_data(
         #     path, self.table_names, self.metadata_obj, self.columns, self.engine
@@ -94,7 +94,7 @@ class SshAnalyzer:
         whitelist_template = "Here are the authorized user:\n" + str(
             whitelist
         )  # TODO, ça n'a pas l'air de marcher, je pense que le meilleur moyen serait d'avoir une table whitelist. DONC à ne pas traiter à priori car il suffit de générer les trucs avec le LLM.
-        return self.qp.run(query=query_str + "\n" + whitelist_template)[0].get_content()
+        return self.qp.run(query=query_str)[0].get_content()
 
     def get_table_context_and_rows_str(
         self, query_str: str, strtable_schema_objs: List[SQLTableSchema]
@@ -150,7 +150,7 @@ class SshAnalyzer:
 
         text2sql_prompt_str = """\
         Given an input question, first create a syntactically correct {dialect} query to run, then look at the results of the query and return the answer.
-        Pay attention to use only the column names that you can see in the schema description. Be careful to not query for columns that do not exist. Pay attention to which column is in which table. Also, qualify column names with the table name when needed. You are required to use the following format, each taking one line:
+        Pay attention to use only the column names that you can see in the schema description. Be careful to not query for columns that do not exist. Pay attention to which column is in which table. Also, qualify column names with the table name when needed. There are no NULL value. You are required to use the following format, each taking one line:
 
         Question: Question here
         SQLQuery: SQL Query to run
@@ -161,7 +161,6 @@ class SshAnalyzer:
         {schema}
 
         
-        Pay attention to all rows from the tables above.
         Question: {query_str}
         SQLQuery:
 
