@@ -34,16 +34,18 @@ def structuring_table(table_names):
     Settings.callback_manager = CallbackManager()
 
     prompt_str = """\
-    You are given a ssh logs data.
-    Give me a summary of the table only by their name and some rows.
-    Name:
+    You are given SSH logs data.
+    Please provide a summary of the table based on its name and some example rows.
+    Here is the table name:
     {table_name}
 
     Here are the columns:
     {columns}
-    
-    Rows Example in the same order as above:
+
+    Here are some example rows in the same order as the columns:
     {rows}
+
+    Please provide a detailed summary of the table, including the table name and a brief description of the data.
     Summary:"""
 
     program = LLMTextCompletionProgram.from_defaults(
@@ -69,7 +71,7 @@ def structuring_table(table_names):
             table_info = program(
                 table_name=table_name, rows=str(rows), columns=str(columns)
             )
-            while attempts < 10:
+            while True:
                 try:
                     table_info = program(table_name=table_name)
                     if table_info is not None:

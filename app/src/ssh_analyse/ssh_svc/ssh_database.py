@@ -84,11 +84,14 @@ drop_empty_tables(engine, Base)
         """Transform the output of the sentence_retriver"""
 
         logger.info("Sentence Retriever Output processing...")
-        sentence_retriever = self.index.as_retriever(similarity_top_k=1)
+        sentence_retriever = self.index.as_retriever(similarity_top_k=6)
 
-        relevant_node = sentence_retriever.retrieve(user_query)
+        relevant_nodes = sentence_retriever.retrieve(user_query)
         logger.info("Relevant Node Retrieved...")
-        return relevant_node[0].text
+        contexts = ""
+        for i in range(6):
+            contexts += str(relevant_nodes[i]) + "\n"
+        return contexts
 
     def get_table_creation_prompt_template(self):
         """Create a Prompt Template for Table generation"""
@@ -165,7 +168,7 @@ drop_empty_tables(engine, Base)
         logger.info("Starting Table Insertion...")
 
         table_insert_prompt_str = """\
-        Given an input question, complete the python code to insert the rows of the file in the database using regex. 
+        Given an input question, complete the python code to insert the rows of the file in the database using regex.
         Pay attention on the insertion. Be careful to not use re.match(). You are required to use the following format, each taking one line:
 
         **Question**: Question here
@@ -205,16 +208,8 @@ drop_empty_tables(engine, Base)
     def get_output_template(self):
         """Reformat the response in the right format"""
         output_prompt_str = """\
-        Pay attention to print only the python code. Be careful to not forget any python code. You are required to follow the following format:
-
-
-        **ChatResponse**: Text to format here
-        **Python Code**: Python Code here
-        **Answer**: Final answer here
-
-        **ChatResponse**: {response}
-        **Python Code**:
-        **Answer**:
+        Please keep only the python code and remove the other text
+        {response}
 
 
         """
@@ -228,12 +223,12 @@ drop_empty_tables(engine, Base)
             modules={
                 "input": InputComponent(),
                 "process_retriever": self.process_retriever_component,
-                "table_creation_prompt": self.table_creation_prompt,
-                "llm1": self.llm,
-                "python_output_parser": self.python_parser_component,
-                "table_insert_prompt": self.table_insert_prompt,
-                "llm2": self.llm,
-                "python_output_parser1": self.python_parser_component,
+                # "table_creation_prompt": self.table_creation_prompt,
+                # "llm1": self.llm,
+                # "python_output_parser": self.python_parser_component,
+                # "table_insert_prompt": self.table_insert_prompt,
+                # "llm2": self.llm,
+                # "python_output_parser1": self.python_parser_component,
                 # "output_parser": self.output_prompt,
                 # "llm3": Settings.llm,
                 # "python_output_parser2": self.python_parser_component,
@@ -242,22 +237,22 @@ drop_empty_tables(engine, Base)
         )
 
         qp.add_link("input", "process_retriever")
-        qp.add_link("input", "table_creation_prompt", dest_key="query_str")
-        qp.add_link(
-            "process_retriever", "table_creation_prompt", dest_key="retrieved_nodes"
-        )
+        # qp.add_link("input", "table_creation_prompt", dest_key="query_str")
+        # qp.add_link(
+        #     "process_retriever", "table_creation_prompt", dest_key="retrieved_nodes"
+        # )
 
-        qp.add_chain(["table_creation_prompt", "llm1", "python_output_parser"])
+        # qp.add_chain(["table_creation_prompt", "llm1", "python_output_parser"])
 
-        qp.add_link("input", "table_insert_prompt", dest_key="query_str")
-        qp.add_link(
-            "process_retriever", "table_insert_prompt", dest_key="retrieved_nodes"
-        )
-        qp.add_link(
-            "python_output_parser", "table_insert_prompt", dest_key="python_code"
-        )
-        qp.add_chain(["table_insert_prompt", "llm2", "python_output_parser1"])
+        # qp.add_link("input", "table_insert_prompt", dest_key="query_str")
+        # qp.add_link(
+        #     "process_retriever", "table_insert_prompt", dest_key="retrieved_nodes"
+        # )
+        # qp.add_link(
+        #     "python_output_parser", "table_insert_prompt", dest_key="python_code"
+        # )
+        # qp.add_chain(["table_insert_prompt", "llm2", "python_output_parser1"])
         # qp.add_link("python_output_parser1", "output_parser", dest_key="response")
-        # qp.add_chain(["output_parser", "llm3", "python_output_parser2"])
+        # qp.add_chain(["output_parser", "llm3"])
 
         return qp
