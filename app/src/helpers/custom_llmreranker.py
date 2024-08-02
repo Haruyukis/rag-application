@@ -3,12 +3,8 @@ from llama_index.core.postprocessor.types import BaseNodePostprocessor
 from llama_index.core.schema import NodeWithScore
 from llama_index.core.llms import LLM
 from typing import List, Optional
-from llama_index.llms.ollama import Ollama
 from llama_index.core.prompts import PromptTemplate
-from loguru import logger
 from pydantic import Field
-
-from src.config import ollama_base_url
 
 
 class LlamaNodePostprocessor(BaseNodePostprocessor):
@@ -67,11 +63,11 @@ class LlamaNodePostprocessor(BaseNodePostprocessor):
         return sorted(nodes, key=lambda x: x.score or 0.0, reverse=True)[: self.top_n]
 
     def _parse_answer_fn(self, response: str):
-        """Parse the answer to retrieve the score to update."""
+        """Parse the answer to retrieve the score"""
+
         ranking_query_start = response.find("**New Score**:")
         if ranking_query_start != -1:
             response = response[ranking_query_start:]
-            # TODO: move to removeprefix after Python 3.9+
             if response.startswith("**New Score**:"):
                 response = response[len("**New Score**:") :]
         answer = response.find("**Answer**:")

@@ -9,12 +9,12 @@ from llama_index.finetuning import SentenceTransformersFinetuneEngine
 from src.config import ollama_base_url
 
 from loguru import logger
+import os
 
 
 def finetuning(folder_path, file_name):
     """Finetune the Embedding Model"""
     # Splitting into two dataset
-    logger.info("Splitting into two dataset")
     with open(folder_path + "/" + file_name, mode="r") as f:
         rows = f.readlines()
         with open(folder_path + "/train/" + file_name, mode="w") as training:
@@ -23,35 +23,38 @@ def finetuning(folder_path, file_name):
         with open(folder_path + "/validate/" + file_name, mode="w") as validate:
             for row in rows[len(rows) // 2 :]:
                 validate.write(row)
+    logger.info(f"Successfully train-test split of the file {folder_path}/{file_name}")
 
     # Loading Nodes
-    logger.info("Loading training and validate nodes")
     train_nodes = basic_load_corpus(folder_path + "/train/", verbose=True)
     val_nodes = basic_load_corpus(folder_path + "/validate/", verbose=True)
 
-    # Generate the dataset
+    # Generate, Storing or Loading the dataset
     Settings.llm = Ollama(
         model="llama3", request_timeout=360.0, base_url=ollama_base_url
     )
-    logger.info("Training dataset generation")
-    # train_dataset = generate_qa_embedding_pairs(
-    #     train_nodes, Settings.llm, num_questions_per_chunk=1
-    # )
-    # logger.info("Validate dataset generation")
-    # val_dataset = generate_qa_embedding_pairs(
-    #     val_nodes, Settings.llm, num_questions_per_chunk=1
-    # )
-    # logger.info("Both dataset generation done")
+    if not os.path.exists("train_dataset.json"):
+        logger.info("Starting to generate QA embedding pairs for training")
+        train_dataset = generate_qa_embedding_pairs(
+            train_nodes, Settings.llm, num_questions_per_chunk=1
+        )
+        train_dataset.save_json("train_dataset.json")
+        logger.info("Successfully generated and stored QA embedding pairs for training")
+    else:
+        train_dataset = EmbeddingQAFinetuneDataset.from_json("train_dataset.json")
+        logger.info("Successfully loaded QA embedding pairs for training")
 
-    # # Save the dataset generated
-    # logger.info("Storing both dataset")
-    # train_dataset.save_json("train_dataset.json")
-    # val_dataset.save_json("val_dataset.json")
+    if not os.path.exists("val_dataset.json"):
+        logger.info("Starting to generate QA embedding pairs for testing")
 
-    # Load the dataset generated
-    logger.info("Loading both dataset")
-    train_dataset = EmbeddingQAFinetuneDataset.from_json("train_dataset.json")
-    val_dataset = EmbeddingQAFinetuneDataset.from_json("val_dataset.json")
+        val_dataset = generate_qa_embedding_pairs(
+            val_nodes, Settings.llm, num_questions_per_chunk=1
+        )
+        val_dataset.save_json("val_dataset.json")
+        logger.info("Successfully generated and stored QA embedding pairs for testing")
+    else:
+        val_dataset = EmbeddingQAFinetuneDataset.from_json("val_dataset.json")
+        logger.info("Successfully loaded QA embedding pairs for testing")
 
     # Finetuning the HuggingFaceEmbeddingModel
     finetune_engine = SentenceTransformersFinetuneEngine(
@@ -61,11 +64,11 @@ def finetuning(folder_path, file_name):
         val_dataset=val_dataset,
         epochs=3,
     )
-    logger.info("Starting to finetune the embedding model")
+
     finetune_engine.finetune()
-    logger.info("Finetuning done")
+    logger.info("Successfully finetuned the embedding model")
 
     # Storing the model
-    logger.info("Storing the finetuned model")
     finetuned_embedding_model = finetune_engine.get_finetuned_model()
     finetuned_embedding_model.to_json()
+    logger.info("Successfully stored the embedding model")
