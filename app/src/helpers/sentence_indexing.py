@@ -9,11 +9,14 @@ from llama_index.llms.ollama import Ollama
 from llama_index.embeddings.huggingface import HuggingFaceEmbedding
 from src.helpers.embedding_finetune import finetuning
 
+from src.helpers.embedding_finetune import finetuning
+
 from loguru import logger
 import os
 
 
 from src.config import ollama_base_url
+from src.helpers.corpus_loader import sentence_load_corpus
 from src.helpers.corpus_loader import sentence_load_corpus
 
 
@@ -24,6 +27,8 @@ def sentence_indexing(folder_path: str):
     )
 
     # Finetune Embedding
+
+    # Finetune Embedding
     Settings.callback_manager = CallbackManager()
     logger.info("Finetuning the embedding model")
     # finetuning(folder_path, "auth.log")
@@ -32,6 +37,7 @@ def sentence_indexing(folder_path: str):
     Settings.embed_model = HuggingFaceEmbedding(model_name="llama_model_v1")
     logger.info("Loading OK")
 
+    nodes = sentence_load_corpus(directory=folder_path, chunk_size=75, chunk_overlap=50)
     nodes = sentence_load_corpus(directory=folder_path, chunk_size=75, chunk_overlap=50)
     for idx, node in enumerate(nodes):
         node.id_ = f"node_{idx}"

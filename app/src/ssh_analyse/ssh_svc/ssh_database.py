@@ -263,12 +263,12 @@ drop_empty_tables(engine, Base)
         )
 
         qp.add_link("input", "process_retriever")
-        qp.add_link("input", "table_creation_prompt", dest_key="query_str")
-        qp.add_link(
-            "process_retriever", "table_creation_prompt", dest_key="retrieved_nodes"
-        )
+        # qp.add_link("input", "table_creation_prompt", dest_key="query_str")
+        # qp.add_link(
+        #     "process_retriever", "table_creation_prompt", dest_key="retrieved_nodes"
+        # )
 
-        qp.add_chain(["table_creation_prompt", "llm1", "python_output_parser"])
+        # qp.add_chain(["table_creation_prompt", "llm1", "python_output_parser"])
 
         qp.add_link("input", "table_insert_prompt", dest_key="query_str")
         qp.add_link(

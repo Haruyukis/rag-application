@@ -37,6 +37,9 @@ def structuring_table(table_names):
     You are given SSH logs data.
     Please provide a summary of the table based on its name and some example rows.
     Here is the table name:
+    You are given SSH logs data.
+    Please provide a summary of the table based on its name and some example rows.
+    Here is the table name:
     {table_name}
 
     Here are the columns:
@@ -44,6 +47,8 @@ def structuring_table(table_names):
 
     Here are some example rows in the same order as the columns:
     {rows}
+
+    Please provide a detailed summary of the table, including the table name and a brief description of the data.
 
     Please provide a detailed summary of the table, including the table name and a brief description of the data.
     Summary:"""
