@@ -2,19 +2,19 @@ from llama_index.core import (
     Settings,
     StorageContext,
     VectorStoreIndex,
-    SimpleDirectoryReader,
     load_index_from_storage,
 )
 from llama_index.core.callbacks import CallbackManager
-from llama_index.core.node_parser import SentenceSplitter
 from llama_index.llms.ollama import Ollama
 from llama_index.embeddings.huggingface import HuggingFaceEmbedding
+from src.helpers.embedding_finetune import finetuning
 
 from loguru import logger
 import os
 
 
 from src.config import ollama_base_url
+from src.helpers.corpus_loader import sentence_load_corpus
 
 
 def sentence_indexing(folder_path: str):
@@ -22,13 +22,17 @@ def sentence_indexing(folder_path: str):
     Settings.llm = Ollama(
         model="llama3", request_timeout=360.0, base_url=ollama_base_url
     )
-    Settings.embed_model = HuggingFaceEmbedding(model_name="BAAI/bge-base-en-v1.5")
+
+    # Finetune Embedding
     Settings.callback_manager = CallbackManager()
+    logger.info("Finetuning the embedding model")
+    # finetuning(folder_path, "auth.log")
+    logger.info("Finetuning the embedding model done")
+    logger.info("Loading the llama_model_v1")
+    Settings.embed_model = HuggingFaceEmbedding(model_name="llama_model_v1")
+    logger.info("Loading OK")
 
-    documents = SimpleDirectoryReader(folder_path).load_data()
-    node_parser = SentenceSplitter(chunk_size=500, chunk_overlap=20)
-
-    nodes = node_parser.get_nodes_from_documents(documents)
+    nodes = sentence_load_corpus(directory=folder_path, chunk_size=75, chunk_overlap=50)
     for idx, node in enumerate(nodes):
         node.id_ = f"node_{idx}"
 
@@ -39,7 +43,7 @@ def sentence_indexing(folder_path: str):
         index.storage_context.persist("database_index_storage")
     else:
         # Loading
-        logger.info("Loading")
+        logger.info("Index loading")
         storage_context = StorageContext.from_defaults(
             persist_dir="database_index_storage"
         )

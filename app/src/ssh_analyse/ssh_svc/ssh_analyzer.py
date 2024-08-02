@@ -45,8 +45,8 @@ class SshAnalyzer:
         Settings.callback_manager = CallbackManager()
 
         # Create Table from Data
-        # self.metadata_obj = MetaData()
         self.table_names = inspect(self.engine).get_table_names()
+        # self.metadata_obj = MetaData()
         # self.columns = [
         # [
         # Column("id", Integer),

@@ -1,4 +1,4 @@
-from llama_index.core import Settings
+from llama_index.core import Settings, QueryBundle
 from llama_index.core.callbacks import CallbackManager
 from llama_index.core.query_pipeline import (
     QueryPipeline as QP,
@@ -10,10 +10,12 @@ from llama_index.embeddings.huggingface import HuggingFaceEmbedding
 from llama_index.core.prompts import PromptTemplate
 from llama_index.core.llms import ChatResponse
 
+
 from loguru import logger
 
 from src.helpers.sentence_indexing import sentence_indexing
 from src.config import ollama_base_url
+from src.helpers.custom_reranking import LlamaNodePostprocessor
 
 
 class SshDatabase:
@@ -27,7 +29,7 @@ class SshDatabase:
         )
 
         Settings.callback_manager = CallbackManager()
-        Settings.embed_model = HuggingFaceEmbedding(model_name="BAAI/bge-base-en-v1.5")
+        Settings.embed_model = HuggingFaceEmbedding(model_name="BAAI/bge-small-en-v1.5")
         self.user_query = user_query
 
         # Indexing & Query Engine
@@ -84,11 +86,38 @@ drop_empty_tables(engine, Base)
         """Transform the output of the sentence_retriver"""
 
         logger.info("Sentence Retriever Output processing...")
-        sentence_retriever = self.index.as_retriever(similarity_top_k=1)
+        with open("ranking_cache.txt", mode="r") as f:
+            lines = f.readlines()
+            logger.info(lines[0])
+            if lines[0] == user_query + "\n":
+                logger.info("Reading cache...")
+                return "".join(lines[1:])
+            else:
+                logger.info("No cache...")
 
-        relevant_node = sentence_retriever.retrieve(user_query)
+        sentence_retriever = self.index.as_retriever(similarity_top_k=5)
+
+        nodes = sentence_retriever.retrieve(user_query)
+
+        # Create a QueryBundle from the user query
+        query_bundle = QueryBundle(query_str=user_query)
+
         logger.info("Relevant Node Retrieved...")
-        return relevant_node[0].text
+        logger.info("Starting the reranking process...")
+        postprocessor = LlamaNodePostprocessor(
+            top_n=3,
+            llm=self.llm,
+        )
+        reranked_nodes = postprocessor.postprocess_nodes(
+            nodes=nodes, query_bundle=query_bundle
+        )
+        contexts = ""
+        for reranked_node in reranked_nodes:
+            contexts += str(reranked_node.text) + "\n"
+        with open("ranking_cache.txt", mode="w") as f:
+            f.write(user_query + "\n")
+            f.write(contexts)
+        return contexts
 
     def get_table_creation_prompt_template(self):
         """Create a Prompt Template for Table generation"""
@@ -110,7 +139,7 @@ drop_empty_tables(engine, Base)
         **Python Code**: '''\
         ```python
         import re
-        from sqlalchemy import Column, Integer, String, ForeignKey
+        from sqlalchemy import Column, Integer, String, Boolean, ForeignKey
         from sqlalchemy.ext.declarative import declarative_base
         from sqlalchemy.orm import sessionmaker
         from sqlalchemy import create_engine
@@ -165,8 +194,8 @@ drop_empty_tables(engine, Base)
         logger.info("Starting Table Insertion...")
 
         table_insert_prompt_str = """\
-        Given an input question, complete the python code to insert the rows of the file in the database using regex. 
-        Pay attention on the insertion. Be careful to not use re.match(). You are required to use the following format, each taking one line:
+        Given an input question, complete the python code to insert the rows of the file in the database using regex.
+        Be careful to not use re.match(). You are required to use the following format, each taking one line:
 
         **Question**: Question here
         **Python Code**: Python Code here
@@ -205,16 +234,8 @@ drop_empty_tables(engine, Base)
     def get_output_template(self):
         """Reformat the response in the right format"""
         output_prompt_str = """\
-        Pay attention to print only the python code. Be careful to not forget any python code. You are required to follow the following format:
-
-
-        **ChatResponse**: Text to format here
-        **Python Code**: Python Code here
-        **Answer**: Final answer here
-
-        **ChatResponse**: {response}
-        **Python Code**:
-        **Answer**:
+        Please keep only the python code and remove the other text
+        {response}
 
 
         """
@@ -234,9 +255,9 @@ drop_empty_tables(engine, Base)
                 "table_insert_prompt": self.table_insert_prompt,
                 "llm2": self.llm,
                 "python_output_parser1": self.python_parser_component,
-                # "output_parser": self.output_prompt,
-                # "llm3": Settings.llm,
-                # "python_output_parser2": self.python_parser_component,
+                "output_parser": self.output_prompt,
+                "llm3": Settings.llm,
+                "python_output_parser2": self.python_parser_component,
             },
             verbose=True,
         )
@@ -257,7 +278,7 @@ drop_empty_tables(engine, Base)
             "python_output_parser", "table_insert_prompt", dest_key="python_code"
         )
         qp.add_chain(["table_insert_prompt", "llm2", "python_output_parser1"])
-        # qp.add_link("python_output_parser1", "output_parser", dest_key="response")
-        # qp.add_chain(["output_parser", "llm3", "python_output_parser2"])
+        qp.add_link("python_output_parser1", "output_parser", dest_key="response")
+        qp.add_chain(["output_parser", "llm3", "python_output_parser2"])
 
         return qp

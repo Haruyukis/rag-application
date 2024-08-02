@@ -2,8 +2,10 @@ fastapi
 uvicorn
 pydantic
 loguru
+llama-index-core
+llama-index-readers-file
+llama-index-finetuning
 llama-index-experimental
-sqlalchemy
 llama-index-embeddings-huggingface
 llama-index-llms-ollama
-pytest
+sqlalchemy
