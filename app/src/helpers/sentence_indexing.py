@@ -24,7 +24,7 @@ def sentence_indexing(folder_path: str) -> VectorStoreIndex:
     Settings.callback_manager = CallbackManager()
 
     logger.info("Starting to load model: llama_model_v1")
-    Settings.embed_model = HuggingFaceEmbedding(model_name="llama_model_v1")
+    Settings.embed_model = HuggingFaceEmbedding(model_name="BAAI/bge-small-en-v1.5")
     logger.info("Successfully loaded model: llama_model_v1")
 
     # Sentence Loader

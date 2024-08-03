@@ -12,9 +12,9 @@ def generate(user_query: str):
 
 
 @app.get("/api/analyse")
-def ssh_analyse(user_query: str, path: str):
+def ssh_analyse(user_query: str):
     """Analyzing ssh log data"""
-    return analyse(user_query, path)
+    return analyse(user_query)
 
 
 @app.get("/api/database")
@@ -24,9 +24,9 @@ def ssh_database(user_query: str, path: str):
 
 
 @app.get("/api/everything")
-def ssh_everything(user_query: str, path: str, file_name: str = ""):
+def ssh_everything(user_query: str, path: str):
     """Create the database and analyse"""
     response = database(user_query, path)
     if response is not None:
         return response
-    return analyse(user_query, path + "/" + file_name)
+    return analyse(user_query)

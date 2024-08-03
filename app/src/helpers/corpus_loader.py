@@ -16,7 +16,6 @@ def sentence_load_corpus(
     directory: str, chunk_size: int, chunk_overlap: int, verbose=False
 ):
     """Transform a document into nodes with SentenceSplitter"""
-
     documents = SimpleDirectoryReader(directory).load_data()
     node_parser = SentenceSplitter(chunk_size=chunk_size, chunk_overlap=chunk_overlap)
     nodes = node_parser.get_nodes_from_documents(documents, show_progress=verbose)

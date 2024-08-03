@@ -5,7 +5,7 @@ from llama_index.core.llms import LLM
 from typing import List, Optional
 from llama_index.core.prompts import PromptTemplate
 from pydantic import Field
-
+from loguru import logger
 
 class LlamaNodePostprocessor(BaseNodePostprocessor):
     """Custom node postprocessor for llama3"""
@@ -30,6 +30,7 @@ class LlamaNodePostprocessor(BaseNodePostprocessor):
     def _postprocess_nodes(
         self, nodes: List[NodeWithScore], query_bundle: Optional[QueryBundle]
     ) -> List[NodeWithScore]:
+        logger.info("Starting to rerank nodes")
         if query_bundle is None:
             raise ValueError("Query bundle must be provided.")
         if len(nodes) == 0:
@@ -59,6 +60,7 @@ class LlamaNodePostprocessor(BaseNodePostprocessor):
                 self.llm.predict(llm_prompt_template.partial_format(node=node))
             )
             node.score = new_score
+        logger.info("Successfully reranked nodes...")
 
         return sorted(nodes, key=lambda x: x.score or 0.0, reverse=True)[: self.top_n]
 

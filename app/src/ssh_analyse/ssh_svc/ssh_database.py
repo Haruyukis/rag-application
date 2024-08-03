@@ -13,9 +13,10 @@ from llama_index.core.llms import ChatResponse
 
 from loguru import logger
 
+from src.helpers.parser.parser_to_python import parse_response_to_python
 from src.helpers.sentence_indexing import sentence_indexing
 from src.config import ollama_base_url
-from src.helpers.custom_reranking import LlamaNodePostprocessor
+from src.helpers.custom_llmreranker import LlamaNodePostprocessor
 
 
 class SshDatabase:
@@ -24,12 +25,11 @@ class SshDatabase:
     def __init__(self, user_query: str, folder_path: str):
         """Constructor"""
         # Initialization
+        Settings.callback_manager = CallbackManager()
+
         self.llm = Ollama(
             model="llama3", request_timeout=600.0, base_url=ollama_base_url
         )
-
-        Settings.callback_manager = CallbackManager()
-        Settings.embed_model = HuggingFaceEmbedding(model_name="BAAI/bge-small-en-v1.5")
         self.user_query = user_query
 
         # Indexing & Query Engine
@@ -44,9 +44,9 @@ class SshDatabase:
         self.table_creation_prompt = self.get_table_creation_prompt_template()
 
         # SQL Output Parser
-        self.python_parser_component = FnComponent(self.parse_response_to_python)
-
-        self.output_prompt = self.get_output_template()
+        self.python_parser_component = FnComponent(
+            self.parse_response_to_python_from_chat
+        )
 
         # Table Insertion PromptTemplate
         self.table_insert_prompt = (
@@ -60,40 +60,22 @@ class SshDatabase:
 
     def run(self):
         """Answer generation"""
-        logger.info(f"Input: {self.user_query}")
-        logger.info("Running the query pipeline...")
-        return (
-            self.query_pipeline.run(query=self.user_query)
-            + """\
-\n\n
-from sqlalchemy import inspect
-# Function to drop empty tables
-def drop_empty_tables(engine, Base):
-    inspector = inspect(engine)
-    for table_name in inspector.get_table_names():
-
-        table = Base.metadata.tables[table_name]
-        if session.query(table).first() is None:
-            print(f"Dropping empty table: {table_name}")
-            table.drop(engine)
-
-# Drop empty tables
-drop_empty_tables(engine, Base)
-"""
+        logger.info(
+            f"Starting to run the query pipeline with the input: {self.user_query}"
         )
+        return self.query_pipeline.run(query=self.user_query)
 
     def process_retriever_component_fn(self, user_query: str):
         """Transform the output of the sentence_retriver"""
-
-        logger.info("Sentence Retriever Output processing...")
         with open("ranking_cache.txt", mode="r") as f:
             lines = f.readlines()
-            logger.info(lines[0])
-            if lines[0] == user_query + "\n":
-                logger.info("Reading cache...")
-                return "".join(lines[1:])
-            else:
-                logger.info("No cache...")
+            try:
+                if lines[0] == user_query + "\n":
+                    logger.info("Successfully retrieved nodes from cache")
+                    return "".join(lines[1:])
+            except:
+                logger.info("Failed to retrieve nodes from cache. No cache available")
+                logger.info("Starting to retrieve nodes")
 
         sentence_retriever = self.index.as_retriever(similarity_top_k=5)
 
@@ -102,8 +84,6 @@ drop_empty_tables(engine, Base)
         # Create a QueryBundle from the user query
         query_bundle = QueryBundle(query_str=user_query)
 
-        logger.info("Relevant Node Retrieved...")
-        logger.info("Starting the reranking process...")
         postprocessor = LlamaNodePostprocessor(
             top_n=3,
             llm=self.llm,
@@ -115,6 +95,7 @@ drop_empty_tables(engine, Base)
         for reranked_node in reranked_nodes:
             contexts += str(reranked_node.text) + "\n"
         with open("ranking_cache.txt", mode="w") as f:
+            logger.info("Starting to cache the relevant nodes")
             f.write(user_query + "\n")
             f.write(contexts)
         return contexts
@@ -155,7 +136,8 @@ drop_empty_tables(engine, Base)
         Base.metadata.create_all(engine)
 
         # Creating the session to the database.
-        session = sessionmaker(bind=engine)()
+        Session = sessionmaker(bind=engine)
+        session = Session()
 
 
         ```
@@ -164,35 +146,16 @@ drop_empty_tables(engine, Base)
         **Answer**:
         
         """
-        table_creation_prompt = PromptTemplate(table_creation_prompt_str)
-        logger.info("Starting Table Creation...")
-        return table_creation_prompt
+        logger.info("Starting to create the table")
+        return PromptTemplate(table_creation_prompt_str)
 
-    def parse_response_to_python(self, response: ChatResponse) -> str:
+    def parse_response_to_python_from_chat(self, response: ChatResponse) -> str:
         """Parse response to Python"""
-        logger.info("Table Creation Done...")
-        logger.info("Reading the python code generated")
-        response = response.message.content
-        python_query_start = response.find("**Python Code**:")
-        if python_query_start != -1:
-            response = response[python_query_start:]
-            # TODO: move to removeprefix after Python 3.9+
-            if response.startswith("**Python Code**:"):
-                response = response[len("**Python Code**:") :]
-        answer = response.find("**Answer**:")
-        if answer != -1:
-            response = response[:answer]
-
-        python_query = response.strip().strip("```").strip()
-        if python_query.startswith("python"):
-            python_query = python_query[len("python") :]
-
+        python_query = parse_response_to_python(str(response.message.content))
         return python_query
 
     def get_table_insert_prompt_template(self):
         """Create a Prompt Template for Table Insertion"""
-        logger.info("Starting Table Insertion...")
-
         table_insert_prompt_str = """\
         Given an input question, complete the python code to insert the rows of the file in the database using regex.
         Be careful to not use re.match(). You are required to use the following format, each taking one line:
@@ -221,30 +184,15 @@ drop_empty_tables(engine, Base)
 
         
         ```
-
-
         **Answer**:
 
 
         """
-        table_insert_prompt = PromptTemplate(table_insert_prompt_str)
 
-        return table_insert_prompt
-
-    def get_output_template(self):
-        """Reformat the response in the right format"""
-        output_prompt_str = """\
-        Please keep only the python code and remove the other text
-        {response}
-
-
-        """
-        output_prompt = PromptTemplate(output_prompt_str)
-        return output_prompt
+        return PromptTemplate(table_insert_prompt_str)
 
     def get_query_pipeline(self):
         """Create & Return the Query Pipeline of database generation"""
-
         qp = QP(
             modules={
                 "input": InputComponent(),
@@ -255,20 +203,17 @@ drop_empty_tables(engine, Base)
                 "table_insert_prompt": self.table_insert_prompt,
                 "llm2": self.llm,
                 "python_output_parser1": self.python_parser_component,
-                "output_parser": self.output_prompt,
-                "llm3": Settings.llm,
-                "python_output_parser2": self.python_parser_component,
             },
             verbose=True,
         )
 
         qp.add_link("input", "process_retriever")
-        # qp.add_link("input", "table_creation_prompt", dest_key="query_str")
-        # qp.add_link(
-        #     "process_retriever", "table_creation_prompt", dest_key="retrieved_nodes"
-        # )
+        qp.add_link("input", "table_creation_prompt", dest_key="query_str")
+        qp.add_link(
+            "process_retriever", "table_creation_prompt", dest_key="retrieved_nodes"
+        )
 
-        # qp.add_chain(["table_creation_prompt", "llm1", "python_output_parser"])
+        qp.add_chain(["table_creation_prompt", "llm1", "python_output_parser"])
 
         qp.add_link("input", "table_insert_prompt", dest_key="query_str")
         qp.add_link(
@@ -278,7 +223,5 @@ drop_empty_tables(engine, Base)
             "python_output_parser", "table_insert_prompt", dest_key="python_code"
         )
         qp.add_chain(["table_insert_prompt", "llm2", "python_output_parser1"])
-        qp.add_link("python_output_parser1", "output_parser", dest_key="response")
-        qp.add_chain(["output_parser", "llm3", "python_output_parser2"])
 
         return qp
