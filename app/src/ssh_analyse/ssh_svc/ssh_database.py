@@ -77,7 +77,7 @@ class SshDatabase:
                 logger.info("Failed to retrieve nodes from cache. No cache available")
                 logger.info("Starting to retrieve nodes")
 
-        sentence_retriever = self.index.as_retriever(similarity_top_k=5)
+        sentence_retriever = self.index.as_retriever(similarity_top_k=10)
 
         nodes = sentence_retriever.retrieve(user_query)
 
@@ -85,7 +85,7 @@ class SshDatabase:
         query_bundle = QueryBundle(query_str=user_query)
 
         postprocessor = LlamaNodePostprocessor(
-            top_n=3,
+            top_n=5,
             llm=self.llm,
         )
         reranked_nodes = postprocessor.postprocess_nodes(
@@ -104,8 +104,8 @@ class SshDatabase:
         """Create a Prompt Template for Table generation"""
 
         table_creation_prompt_str = """\
-        Given an input question and a python code, complete the python code by generating only SQL tables with their attributes needed to answer to the question.
-        Pay attention to the table creation. Pay attention to the table name, they need to answer to the input question. You are required to use the following format, each taking one line:
+        Given an input question and a python code, complete the python code by generating only SQL tables with their attributes to answer to the input question.
+        Pay attention to the table creation. Be carefull to have attributes for all values in the example given. You are required to use the following format, each taking one line:
 
         **Question**: Question here
         **Python Code**: Python Code here
@@ -120,10 +120,9 @@ class SshDatabase:
         **Python Code**: '''\
         ```python
         import re
-        from sqlalchemy import Column, Integer, String, Boolean, ForeignKey
+        from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, create_engine
         from sqlalchemy.ext.declarative import declarative_base
-        from sqlalchemy.orm import sessionmaker
-        from sqlalchemy import create_engine
+        from sqlalchemy.orm import sessionmaker, relationship
 
         # Engine
         engine = create_engine("sqlite:///logs.db")
@@ -136,8 +135,8 @@ class SshDatabase:
         Base.metadata.create_all(engine)
 
         # Creating the session to the database.
-        Session = sessionmaker(bind=engine)
-        session = Session()
+        SessionMaker = sessionmaker(bind=engine)
+        session = SessionMaker()
 
 
         ```
@@ -157,8 +156,8 @@ class SshDatabase:
     def get_table_insert_prompt_template(self):
         """Create a Prompt Template for Table Insertion"""
         table_insert_prompt_str = """\
-        Given an input question, complete the python code to insert the rows of the file in the database using regex.
-        Be careful to not use re.match(). You are required to use the following format, each taking one line:
+        Given an input question and a python code, complete the python code to insert each line in the database that answer the input question using regex.
+        Pay attention to the insertion. Be careful to not use re.match(). You are required to use the following format, each taking one line:
 
         **Question**: Question here
         **Python Code**: Python Code here
@@ -175,8 +174,6 @@ class SshDatabase:
 
     with open({path}, "r") as logfile:
         for line in logfile:
-            # Here is the regex search
-
         
             # Here is the insertion in the database
 
@@ -200,9 +197,9 @@ class SshDatabase:
                 "table_creation_prompt": self.table_creation_prompt,
                 "llm1": self.llm,
                 "python_output_parser": self.python_parser_component,
-                "table_insert_prompt": self.table_insert_prompt,
-                "llm2": self.llm,
-                "python_output_parser1": self.python_parser_component,
+                # "table_insert_prompt": self.table_insert_prompt,
+                # "llm2": self.llm,
+                # "python_output_parser1": self.python_parser_component,
             },
             verbose=True,
         )
@@ -215,13 +212,13 @@ class SshDatabase:
 
         qp.add_chain(["table_creation_prompt", "llm1", "python_output_parser"])
 
-        qp.add_link("input", "table_insert_prompt", dest_key="query_str")
-        qp.add_link(
-            "process_retriever", "table_insert_prompt", dest_key="retrieved_nodes"
-        )
-        qp.add_link(
-            "python_output_parser", "table_insert_prompt", dest_key="python_code"
-        )
-        qp.add_chain(["table_insert_prompt", "llm2", "python_output_parser1"])
+        # qp.add_link("input", "table_insert_prompt", dest_key="query_str")
+        # qp.add_link(
+        #     "process_retriever", "table_insert_prompt", dest_key="retrieved_nodes"
+        # )
+        # qp.add_link(
+        #     "python_output_parser", "table_insert_prompt", dest_key="python_code"
+        # )
+        # qp.add_chain(["table_insert_prompt", "llm2", "python_output_parser1"])
 
         return qp
