@@ -105,7 +105,8 @@ class SshDatabase:
 
         table_creation_prompt_str = """\
         Given an input question and a python code, complete the python code by generating only SQL tables with their attributes to answer to the input question.
-        Pay attention to the table creation. Be carefull to have attributes for all values in the example given. You are required to use the following format, each taking one line:
+        Pay attention to the table creation. Be careful to have attributes for all values in the example given. Each table need to have also an id attribute, it is independant from the input question.
+        Be careful to not remove any python code given. You are required to use the following format, each taking one line:
 
         **Question**: Question here
         **Python Code**: Python Code here
@@ -157,7 +158,7 @@ class SshDatabase:
         """Create a Prompt Template for Table Insertion"""
         table_insert_prompt_str = """\
         Given an input question and a python code, complete the python code to insert each line in the database that answer the input question using regex.
-        Pay attention to the insertion. Be careful to not use re.match(). You are required to use the following format, each taking one line:
+        Pay attention to the regex. Be careful to insert all values in the example given in the associated attribute. Be careful to not use re.match(). You are required to use the following format, each taking one line:
 
         **Question**: Question here
         **Python Code**: Python Code here
