@@ -14,7 +14,8 @@ def parse_using_llm(python_code: str):
 
     llm = Settings.llm
     llm_str = """\
-        Given a python code, you need to retrieve only the python code. Be careful to not forget any python code. You are required to use the following format, each taking one line:
+        Given a python code, you need to retrieve only the python code. Do not put any header in your answer.
+        Be careful to not forget any python code. You are required to use the following format, each taking one line:
 
         **Python Code**: Python code here
         **Answer**: Answer here

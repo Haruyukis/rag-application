@@ -37,6 +37,8 @@ drop_empty_tables(engine, Base)
             os.remove("logs.db")
 
         run_python(response + drop_empty_table_prompt, path="draft")
+        with open("test.py", mode="w") as f:
+            f.write(response)
     except:
         corrected_response = parse_using_llm(response)
         try:

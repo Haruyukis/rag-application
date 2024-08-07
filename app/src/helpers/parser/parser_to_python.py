@@ -14,4 +14,7 @@ def parse_response_to_python(response: str) -> str:
     if python_query.startswith("python"):
         python_query = python_query[len("python") :]
 
+    with open("test.txt", mode="w") as f:
+        f.write(python_query)
+
     return python_query
