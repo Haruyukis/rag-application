@@ -6,7 +6,6 @@ from llama_index.core.query_pipeline import (
     FnComponent,
 )
 from llama_index.llms.ollama import Ollama
-from llama_index.embeddings.huggingface import HuggingFaceEmbedding
 from llama_index.core.prompts import PromptTemplate
 from llama_index.core.llms import ChatResponse
 
