@@ -15,7 +15,7 @@ from loguru import logger
 
 from src.helpers.parser.parser_to_python import parse_response_to_python
 from src.helpers.sentence_indexing import sentence_indexing
-from src.config import ollama_base_url
+from src.config import ollama_base_url, llm_model
 from src.helpers.custom_llmreranker import LlamaNodePostprocessor
 
 
@@ -28,7 +28,7 @@ class SshDatabase:
         Settings.callback_manager = CallbackManager()
 
         self.llm = Ollama(
-            model="llama3", request_timeout=600.0, base_url=ollama_base_url
+            model=llm_model, request_timeout=600.0, base_url=ollama_base_url
         )
         self.user_query = user_query
 
