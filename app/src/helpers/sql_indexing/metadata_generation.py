@@ -2,13 +2,13 @@ from llama_index.core import Settings
 from llama_index.llms.ollama import Ollama
 from llama_index.core.callbacks import CallbackManager
 from llama_index.core.program import LLMTextCompletionProgram
-
+from llama_index.embeddings.huggingface import HuggingFaceEmbedding
 from sqlalchemy import create_engine, text, inspect
 from loguru import logger
 import time
 
 from typing import List
-from src.config import ollama_base_url
+from src.config import ollama_base_url, llm_model, embedding_model
 from src.ssh_analyse.ssh_model import TableInfo
 
 
@@ -16,8 +16,11 @@ def structuring_table(table_names: List[str]) -> List[str]:
     """Generate metadata for each table"""
     # Setting initialization
     Settings.llm = Ollama(
-        model="llama3", request_timeout=360.0, base_url=ollama_base_url
+        model=llm_model, request_timeout=360.0, base_url=ollama_base_url
     )
+
+    Settings.embed_model = HuggingFaceEmbedding(model_name=embedding_model)
+
     Settings.callback_manager = CallbackManager()
 
     # Initialization

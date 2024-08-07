@@ -6,7 +6,7 @@ from llama_index.core.evaluation import (
     generate_qa_embedding_pairs,
 )
 from llama_index.finetuning import SentenceTransformersFinetuneEngine
-from src.config import ollama_base_url
+from src.config import ollama_base_url, llm_model, embedding_model
 
 from loguru import logger
 import os
@@ -31,7 +31,7 @@ def finetuning(folder_path, file_name):
 
     # Generate, Storing or Loading the dataset
     Settings.llm = Ollama(
-        model="llama3", request_timeout=360.0, base_url=ollama_base_url
+        model=llm_model, request_timeout=360.0, base_url=ollama_base_url
     )
     if not os.path.exists("train_dataset.json"):
         logger.info("Starting to generate QA embedding pairs for training")

@@ -11,20 +11,20 @@ from llama_index.embeddings.huggingface import HuggingFaceEmbedding
 from loguru import logger
 import os
 
-from src.config import ollama_base_url
+from src.config import ollama_base_url, llm_model, embedding_model
 from src.helpers.corpus_loader import sentence_load_corpus
 
 
 def sentence_indexing(folder_path: str) -> VectorStoreIndex:
     # Initialization:
     Settings.llm = Ollama(
-        model="llama3", request_timeout=360.0, base_url=ollama_base_url
+        model=llm_model, request_timeout=360.0, base_url=ollama_base_url
     )
     # Finetune Embedding
     Settings.callback_manager = CallbackManager()
 
     logger.info("Starting to load model: llama_model_v1")
-    Settings.embed_model = HuggingFaceEmbedding(model_name="BAAI/bge-small-en-v1.5")
+    Settings.embed_model = HuggingFaceEmbedding(model_name=embedding_model)
     logger.info("Successfully loaded model: llama_model_v1")
 
     # Sentence Loader

@@ -1,9 +1,13 @@
-from llama_index.core import VectorStoreIndex, SQLDatabase
+from llama_index.core import VectorStoreIndex, SQLDatabase, Settings
 from llama_index.core.objects import SQLTableNodeMapping, SQLTableSchema, ObjectIndex
+from src.config import embedding_model
+from llama_index.embeddings.huggingface import HuggingFaceEmbedding
 
 
 def object_indexing(engine, table_infos):
     """Object Indexing for each table"""
+    Settings.embed_model = HuggingFaceEmbedding(model_name=embedding_model)
+
     sql_database = SQLDatabase(engine)
 
     table_node_mapping = SQLTableNodeMapping(sql_database)

@@ -18,7 +18,7 @@ from llama_index.llms.ollama import Ollama
 from sqlalchemy import create_engine, inspect
 from typing import List
 
-from src.config import ollama_base_url
+from src.config import ollama_base_url, llm_model
 from src.helpers.sql_indexing.table_rows_indexing import index_all_tables
 from src.helpers.sql_indexing.metadata_generation import structuring_table
 from src.helpers.sql_indexing.object_indexing import object_indexing
@@ -34,7 +34,7 @@ class SshAnalyzer:
         self.sql_database = SQLDatabase(self.engine)
 
         Settings.llm = Ollama(
-            model="llama3", request_timeout=360.0, base_url=ollama_base_url
+            model=llm_model, request_timeout=360.0, base_url=ollama_base_url
         )
         Settings.callback_manager = CallbackManager()
 

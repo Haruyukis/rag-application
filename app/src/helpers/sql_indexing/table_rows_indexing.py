@@ -1,19 +1,19 @@
-from llama_index.core import (
-    SQLDatabase,
-    VectorStoreIndex,
-)
+from llama_index.core import SQLDatabase, VectorStoreIndex, Settings
 from llama_index.core.schema import TextNode
+from llama_index.embeddings.huggingface import HuggingFaceEmbedding
 
 
 from typing import Dict, List
 from sqlalchemy import text
 from loguru import logger
+from src.config import embedding_model
 
 
 def index_all_tables(
     sql_database: SQLDatabase, table_names: List[str]
 ) -> Dict[str, VectorStoreIndex]:
     """Index all tables."""
+    Settings.embed_model = HuggingFaceEmbedding(model_name=embedding_model)
 
     # Creation d'un dictionnaire de VectorStoreIndex:
     vector_index_dict = {}

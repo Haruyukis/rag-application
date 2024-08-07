@@ -1,7 +1,7 @@
 from llama_index.core import Settings
 from llama_index.llms.ollama import Ollama
 from llama_index.core.prompts import PromptTemplate
-from src.config import ollama_base_url
+from src.config import ollama_base_url, llm_model
 from src.helpers.parser.parser_to_python import parse_response_to_python
 from loguru import logger
 
@@ -9,7 +9,7 @@ from loguru import logger
 def parse_using_llm(python_code: str):
     """Parse the response into a Python Code"""
     Settings.llm = Ollama(
-        model="llama3", request_timeout=360.0, base_url=ollama_base_url
+        model=llm_model, request_timeout=360.0, base_url=ollama_base_url
     )
 
     llm = Settings.llm
