@@ -106,7 +106,7 @@ class SshDatabase:
         Given an input question and a Python code, complete the Python code by generating only the SQLAlchemy table definitions with their attributes to answer the input question.
         Each table needs to have an `id` attribute as the primary key. Do not remove or modify any existing Python code.
 
-        You are required to use the following format, each taking one line:
+        You are required to use the following format:
 
         **Question**: Question here
         **Python Code**: Python Code here
@@ -162,8 +162,7 @@ session = SessionMaker()
         table_insert_prompt_str = """\
         Given an input question and a python code, complete the python code to insert each line in the database that answer the input question using regex.
         Pay attention to the regex pattern and use `re.search()`. When generating regex patterns that include literal parentheses, please ensure they are escaped (e.g., `\\(` and `\\)`). For capturing groups, use parentheses without escaping (e.g., `(\\w+)`).
-        Be careful to insert all values in the example given in the associated attribute. Do not remove or modify any existing Python code.
-        You are required to use the following format, each taking one line:
+        Do not use `session.query()`. Do not remove or modify any existing Python code. You are required to use the following format:
 
         **Question**: Question here
         **Python Code**: Python Code here

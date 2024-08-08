@@ -39,7 +39,7 @@ class LlamaNodePostprocessor(BaseNodePostprocessor):
 
         llm_str = """\
             User Input: {query_str}
-            What you need to do, is to re-rank (give new score) for each node depending if they are useful or not to the user input. The result after new score must be a python float. You are required to use the following format, each taking one line:
+            What you need to do, is to re-rank (give new score) for each node depending if they are useful or not to the user input. Do not put anything after the score. You are required to use the following format, each taking one line:
 
             **New Score**: New score here
             **Answer**: Answer here
