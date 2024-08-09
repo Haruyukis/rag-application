@@ -9,7 +9,7 @@ from loguru import logger
 def parse_using_llm(python_code: str):
     """Parse the response into a Python Code"""
     Settings.llm = Ollama(
-        model=llm_model, request_timeout=360.0, base_url=ollama_base_url
+        model="llama3", request_timeout=360.0, base_url=ollama_base_url
     )
 
     llm = Settings.llm

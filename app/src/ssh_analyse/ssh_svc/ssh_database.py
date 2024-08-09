@@ -21,7 +21,7 @@ from src.helpers.custom_llmreranker import LlamaNodePostprocessor
 class SshDatabase:
     """Ssh Database Generation"""
 
-    def __init__(self, user_query: str, folder_path: str):
+    def __init__(self, user_query: str, folder_path: str, file_name: str):
         """Constructor"""
         # Initialization
         Settings.callback_manager = CallbackManager()
@@ -32,7 +32,7 @@ class SshDatabase:
         self.user_query = user_query
 
         # Indexing & Query Engine
-        self.index = sentence_indexing(folder_path=folder_path)
+        self.index = sentence_indexing(folder_path=folder_path, file=file_name)
 
         # Retriever processing
         self.process_retriever_component = FnComponent(
@@ -50,7 +50,7 @@ class SshDatabase:
         # Table Insertion PromptTemplate
         self.table_insert_prompt = (
             self.get_table_insert_prompt_template().partial_format(
-                path=f"./{folder_path}/auth.log"
+                path=f"./{folder_path}/{file_name}"
             )
         )
 
@@ -104,7 +104,7 @@ class SshDatabase:
 
         table_creation_prompt_str = """\
         Given an input question and a Python code, complete the Python code by generating only the SQLAlchemy table definitions with their attributes to answer the input question.
-        Each table needs to have an `id` attribute as the primary key. Do not remove or modify any existing Python code.
+        Each table needs to have an `id` attribute as the primary key. Do not use any ForeignKey and relationship. Do not remove or modify any existing Python code.
 
         You are required to use the following format:
 
@@ -121,9 +121,9 @@ class SshDatabase:
         **Python Code**: '''\
 ```python
 import re
-from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, create_engine
+from sqlalchemy import Column, Integer, String, Boolean, create_engine
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker, relationship
+from sqlalchemy.orm import sessionmaker
 
 # Engine
 engine = create_engine("sqlite:///logs.db")
@@ -162,7 +162,7 @@ session = SessionMaker()
         table_insert_prompt_str = """\
         Given an input question and a python code, complete the python code to insert each line in the database that answer the input question using regex.
         Pay attention to the regex pattern and use `re.search()`. When generating regex patterns that include literal parentheses, please ensure they are escaped (e.g., `\\(` and `\\)`). For capturing groups, use parentheses without escaping (e.g., `(\\w+)`).
-        Do not use `session.query()`. Do not remove or modify any existing Python code. You are required to use the following format:
+        When inserting inside the database, you must use `.add()`. Do not remove or modify any existing Python code. You are required to use the following format:
 
         **Question**: Question here
         **Python Code**: Python Code here

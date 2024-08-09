@@ -57,10 +57,20 @@ class LlamaNodePostprocessor(BaseNodePostprocessor):
         )
 
         for node in nodes:
-            new_score = self._parse_answer_fn(
-                self.llm.predict(llm_prompt_template.partial_format(node=node))
-            )
-            node.score = new_score
+            attempts = 0
+            while attempts < 3:
+                try:
+                    new_score = float(self._parse_answer_fn(
+                        self.llm.predict(llm_prompt_template.partial_format(node=node))
+                    ))
+                    node.score = new_score
+                    logger.info(f"Node score is: {new_score}")
+                    break
+                except:
+                    logger.info(f"Failed to re-ranked the node for the {attempts} times")
+                    attempts += 1
+                    if attempts == 3:
+                        logger.info("Failed to re-ranked the node. The score won\'t be changed")
         logger.info("Successfully reranked nodes...")
 
         return sorted(nodes, key=lambda x: x.score or 0.0, reverse=True)[: self.top_n]
@@ -76,4 +86,4 @@ class LlamaNodePostprocessor(BaseNodePostprocessor):
         answer = response.find("**Answer**:")
         if answer != -1:
             response = response[:answer]
-        return float(response)
+        return response

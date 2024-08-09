@@ -15,7 +15,7 @@ from src.config import ollama_base_url, llm_model, embedding_model
 from src.helpers.corpus_loader import sentence_load_corpus
 
 
-def sentence_indexing(folder_path: str) -> VectorStoreIndex:
+def sentence_indexing(folder_path: str, file: str) -> VectorStoreIndex:
     # Initialization:
     Settings.llm = Ollama(
         model=llm_model, request_timeout=360.0, base_url=ollama_base_url
@@ -28,7 +28,7 @@ def sentence_indexing(folder_path: str) -> VectorStoreIndex:
     logger.info("Successfully loaded model: llama_model_v1")
 
     # Sentence Loader
-    nodes = sentence_load_corpus(directory=folder_path, chunk_size=75, chunk_overlap=50)
+    nodes = sentence_load_corpus(directory=folder_path, file=file, chunk_size=75, chunk_overlap=50)
 
     for idx, node in enumerate(nodes):
         node.id_ = f"node_{idx}"
