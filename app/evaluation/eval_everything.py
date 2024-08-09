@@ -9,6 +9,10 @@ def eval_everything(
     """Evaluate every task and make an average"""
     evaluation = []
     for task, ground_truth in zip(tasks, ground_truths):
+<<<<<<< HEAD
+=======
+        logger.info(f"Starting the evaluation for the task: {task}")
+>>>>>>> 144606388fa9ca0934e2e5edea410319e24f6f56
         sum = 0
         successfull_attempts = 0
         while successfull_attempts < 5:
@@ -41,7 +45,13 @@ if __name__ == "__main__":
     precision = []
     list_ground_truths = [ground_truths, ground_truths2]
     for i, file in enumerate(file_names):
+<<<<<<< HEAD
         evaluation = eval_everything(tasks, list_ground_truths[i], file_name=file)
+=======
+        logger.info(f"Starting the evaluation for the file: {file}")
+        evaluation = eval_everything(tasks, list_ground_truths[i], file_name=file)
+        logger.info(f"Successfully evaluate for the file: {file}")
+>>>>>>> 144606388fa9ca0934e2e5edea410319e24f6f56
         precision.append(evaluation)
     with open("evaluation.txt", mode="w") as f:
         f.write(str(precision))
