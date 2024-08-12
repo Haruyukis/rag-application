@@ -9,23 +9,21 @@ def eval_everything(
     """Evaluate every task and make an average"""
     evaluation = []
     for task, ground_truth in zip(tasks, ground_truths):
-<<<<<<< HEAD
-=======
         logger.info(f"Starting the evaluation for the task: {task}")
->>>>>>> 144606388fa9ca0934e2e5edea410319e24f6f56
         sum = 0
         successfull_attempts = 0
         while successfull_attempts < 5:
-            output = ssh_everything(
-                user_query=task, path="./data/log", file_name=file_name
-            )
             try:
-                output_list = eval(output)
-                successfull_attempts += 1
-                sum += len(output_list)
-                logger.info(
-                    f"Attempts for the task {task}: {successfull_attempts}, Output: {len(output_list)}, Ground-Truth: {ground_truth}"
+                output = ssh_everything(
+                    user_query=task, path="./data/log", file_name=file_name
                 )
+                output_list = eval(output)
+                if isinstance(output_list, list):
+                    successfull_attempts += 1
+                    sum += len(output_list)
+                    logger.info(
+                        f"Attempts for the task {task}: {successfull_attempts}, Output: {len(output_list)}, Ground-Truth: {ground_truth}"
+                    )
             except:
                 logger.info("Task failed, trying once again...")
         precision = sum / 5 / ground_truth
@@ -34,24 +32,25 @@ def eval_everything(
 
 
 if __name__ == "__main__":
-    file_names = ["auth.log", "auth2.log"]
+    file_names = ["auth.log", "auth2.log", "auth3.log"]
+
     tasks = [
         "Please list all users with their username that failed to log in",
-        "Please list all users with their username that successfully logged in",
+        "Please list all users with their username that successfully logged in"
     ]
     ground_truths = [2831, 190]
     ground_truths2 = [7319, 221]
+    ground_truths3 = [7845, 436]
 
     precision = []
-    list_ground_truths = [ground_truths, ground_truths2]
+    list_ground_truths = [ground_truths, ground_truths2, ground_truths3]
+    file_names.reverse()
+    list_ground_truths.reverse()
+
     for i, file in enumerate(file_names):
-<<<<<<< HEAD
-        evaluation = eval_everything(tasks, list_ground_truths[i], file_name=file)
-=======
         logger.info(f"Starting the evaluation for the file: {file}")
         evaluation = eval_everything(tasks, list_ground_truths[i], file_name=file)
         logger.info(f"Successfully evaluate for the file: {file}")
->>>>>>> 144606388fa9ca0934e2e5edea410319e24f6f56
         precision.append(evaluation)
     with open("evaluation.txt", mode="w") as f:
         f.write(str(precision))

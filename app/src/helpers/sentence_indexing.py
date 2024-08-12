@@ -33,7 +33,7 @@ def sentence_indexing(folder_path: str, file: str) -> VectorStoreIndex:
     for idx, node in enumerate(nodes):
         node.id_ = f"node_{idx}"
 
-    if not os.path.exists("database_index_storage"):
+    if not os.path.exists("database_index_storage") or True:
         # Indexing & Storing
         index = VectorStoreIndex(nodes, show_progress=True)
         index.storage_context.persist("database_index_storage")
