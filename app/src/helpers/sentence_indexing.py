@@ -28,20 +28,22 @@ def sentence_indexing(folder_path: str, file: str) -> VectorStoreIndex:
     logger.info("Successfully loaded model: llama_model_v1")
 
     # Sentence Loader
-    nodes = sentence_load_corpus(directory=folder_path, file=file, chunk_size=75, chunk_overlap=50)
+    nodes = sentence_load_corpus(
+        directory=folder_path, file=file, chunk_size=75, chunk_overlap=50
+    )
 
     for idx, node in enumerate(nodes):
         node.id_ = f"node_{idx}"
 
-    if not os.path.exists("database_index_storage") or True:
+    if not os.path.exists(f"database_index_storage/{file}"):
         # Indexing & Storing
         index = VectorStoreIndex(nodes, show_progress=True)
-        index.storage_context.persist("database_index_storage")
+        index.storage_context.persist(f"database_index_storage/{file}")
         logger.info("Successfully indexed and stored the index")
     else:
         # Loading
         storage_context = StorageContext.from_defaults(
-            persist_dir="database_index_storage"
+            persist_dir=f"database_index_storage/{file}"
         )
         index = load_index_from_storage(storage_context)
         if not isinstance(index, VectorStoreIndex):
