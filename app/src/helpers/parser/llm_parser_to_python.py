@@ -35,4 +35,4 @@ def parse_using_llm(python_code: str):
     logger.info("\033[95m > Running parser corrector. \033[0m")
     response_generated = llm.predict(llm_prompt_template)
 
-    return parse_response_to_python(response_generated)
+    return parse_response_to_python(response_generated, "correction.txt")

@@ -1,5 +1,8 @@
-def parse_response_to_python(response: str) -> str:
+def parse_response_to_python(response: str, file_name: str) -> str:
     """Parse response to Python"""
+    with open(file_name, mode="w") as f:
+        f.write(response)
+
     python_query_start = response.find("**Python Code**:")
     if python_query_start != -1:
         response = response[python_query_start:]
@@ -14,7 +17,8 @@ def parse_response_to_python(response: str) -> str:
     if python_query.startswith("python"):
         python_query = python_query[len("python") :]
 
-    with open("test.txt", mode="w") as f:
+    with open(file_name, mode="a") as f:
+        f.write("\n\n\n")
         f.write(python_query)
 
     return python_query

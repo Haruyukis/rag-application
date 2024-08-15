@@ -47,6 +47,10 @@ class SshDatabase:
             self.parse_response_to_python_from_chat
         )
 
+        self.python_parser_component1 = FnComponent(
+            self.parse_response_to_python_from_chat1
+        )
+
         # Table Insertion PromptTemplate
         self.table_insert_prompt = (
             self.get_table_insert_prompt_template().partial_format(
@@ -66,7 +70,7 @@ class SshDatabase:
 
     def process_retriever_component_fn(self, user_query: str):
         """Transform the output of the sentence_retriver"""
-        #with open("ranking_cache.txt", mode="r") as f:
+        # with open("ranking_cache.txt", mode="r") as f:
         #    lines = f.readlines()
         #    try:
         #        if lines[0] == user_query + "\n":
@@ -153,7 +157,16 @@ session = SessionMaker()
 
     def parse_response_to_python_from_chat(self, response: ChatResponse) -> str:
         """Parse response to Python"""
-        python_query = parse_response_to_python(str(response.message.content))
+        python_query = parse_response_to_python(
+            str(response.message.content), file_name="creation.txt"
+        )
+        return python_query
+
+    def parse_response_to_python_from_chat1(self, response: ChatResponse) -> str:
+        """Parse response to Python"""
+        python_query = parse_response_to_python(
+            str(response.message.content), file_name="insertion.txt"
+        )
         return python_query
 
     def get_table_insert_prompt_template(self):
@@ -205,7 +218,7 @@ session = SessionMaker()
                 "python_output_parser": self.python_parser_component,
                 "table_insert_prompt": self.table_insert_prompt,
                 "llm2": self.llm,
-                "python_output_parser1": self.python_parser_component,
+                "python_output_parser1": self.python_parser_component1,
             },
             verbose=True,
         )
