@@ -40,19 +40,19 @@ drop_empty_tables(engine, Base)
 
             run_python(response + drop_empty_table_prompt, path="draft")
             break
+        #except:
+        #    corrected_response = parse_using_llm(response)
+        #    try:
+        #        if os.path.exists("logs.db"):
+        #            os.remove("logs.db")
+        #        run_python(corrected_response + drop_empty_table_prompt, path="draft")
+        #        break
         except:
-            corrected_response = parse_using_llm(response)
-            try:
-                if os.path.exists("logs.db"):
-                    os.remove("logs.db")
-                run_python(corrected_response + drop_empty_table_prompt, path="draft")
-                break
-            except:
-                attempts += 1
-                logger.info(f"The LLM failed to generate the database. {attempts} times")
-                if attempts == 3:
-                    logger.info("Maximum attempts reached")
-                    return "The LLM failed to generated the database..."
+            attempts += 1
+            logger.info(f"The LLM failed to generate the database. {attempts} times")
+            if attempts == 3:
+                logger.info("Maximum attempts reached")
+                return "The LLM failed to generated the database..."
     engine = create_engine("sqlite:///logs.db")
     inspector = inspect(engine)
     if len(inspector.get_table_names()) == 0:

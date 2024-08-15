@@ -13,6 +13,7 @@ from llama_index.core.llms import ChatResponse
 from loguru import logger
 
 from src.helpers.parser.parser_to_python import parse_response_to_python
+from src.helpers.parser.llm_parser_to_python import parse_using_llm
 from src.helpers.sentence_indexing import sentence_indexing
 from src.config import ollama_base_url, llm_model
 from src.helpers.custom_llmreranker import LlamaNodePostprocessor
@@ -30,6 +31,7 @@ class SshDatabase:
             model=llm_model, request_timeout=600.0, base_url=ollama_base_url
         )
         self.user_query = user_query
+        self.file_name = file_name
 
         # Indexing & Query Engine
         self.index = sentence_indexing(folder_path=folder_path, file=file_name)
@@ -70,15 +72,15 @@ class SshDatabase:
 
     def process_retriever_component_fn(self, user_query: str):
         """Transform the output of the sentence_retriver"""
-        # with open("ranking_cache.txt", mode="r") as f:
-        #    lines = f.readlines()
-        #    try:
-        #        if lines[0] == user_query + "\n":
-        #            logger.info("Successfully retrieved nodes from cache")
-        #            return "".join(lines[1:])
-        #    except:
-        #        logger.info("Failed to retrieve nodes from cache. No cache available")
-        #        logger.info("Starting to retrieve nodes")
+        with open("ranking_cache.txt", mode="r") as f:
+            lines = f.readlines()
+            try:
+                if lines[0] == user_query + self.file_name + "\n":
+                    logger.info("Successfully retrieved nodes from cache")
+                    return "".join(lines[1:])
+            except:
+                logger.info("Failed to retrieve nodes from cache. No cache available")
+                logger.info("Starting to retrieve nodes")
 
         sentence_retriever = self.index.as_retriever(similarity_top_k=10)
 
@@ -99,7 +101,7 @@ class SshDatabase:
             contexts += str(reranked_node.text) + "\n"
         with open("ranking_cache.txt", mode="w") as f:
             logger.info("Starting to cache the relevant nodes")
-            f.write(user_query + "\n")
+            f.write(user_query + self.file_name + "\n")
             f.write(contexts)
         return contexts
 
@@ -108,7 +110,7 @@ class SshDatabase:
 
         table_creation_prompt_str = """\
         Given an input question and a Python code, complete the Python code by generating only the SQLAlchemy table definitions with their attributes to answer the input question.
-        When generating the table definition, please ensure to not generate any attributes for counting or statistics (e.g., `attempts` and `count`). Each table needs to have an `id` attribute as the primary key. Do not use any ForeignKey and relationship. Do not remove or modify any existing Python code.
+        Do not answer the input question. Each table needs to have an `id` attribute as the primary key. Pay attention to the table names, do not use generic names. Do not use any ForeignKey and relationship. Do not remove or modify any existing Python code.
 
         You are required to use the following format:
 
@@ -164,9 +166,7 @@ session = SessionMaker()
 
     def parse_response_to_python_from_chat1(self, response: ChatResponse) -> str:
         """Parse response to Python"""
-        python_query = parse_response_to_python(
-            str(response.message.content), file_name="insertion.txt"
-        )
+        python_query = parse_using_llm(str(response.message.content))
         return python_query
 
     def get_table_insert_prompt_template(self):
@@ -175,17 +175,13 @@ session = SessionMaker()
         table_insert_prompt_str = """\
         Given an input question and a python code, complete the python code to insert each line in the database that answer the input question using regex.
         Pay attention to the regex pattern and use `re.search()`. When generating regex patterns that include literal parentheses, please ensure they are escaped (e.g., `\\(` and `\\)`). For capturing groups, use parentheses without escaping (e.g., `(\\w+)`).
-        When inserting inside the database, you must use `.add()`. Do not remove or modify any existing Python code. You are required to use the following format:
-
-        **Question**: Question here
-        **Python Code**: Python Code here
-        **Answer**: Final answer here
+        Do not answer to the input question. When inserting inside the database, you must use `.add()`. Do not remove or modify any existing Python code. You are required to use the following format:
 
         Here are some examples of logs.
         {retrieved_nodes}
 
         **Question**: {query_str}
-        **Python Code**: 
+        **Python Code**:
         ```python
         {python_code}
 
@@ -200,7 +196,6 @@ session = SessionMaker()
 
         
         ```
-        **Answer**:
 
 
         """

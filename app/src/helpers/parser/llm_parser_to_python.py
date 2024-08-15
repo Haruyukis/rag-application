@@ -8,6 +8,8 @@ from loguru import logger
 
 def parse_using_llm(python_code: str):
     """Parse the response into a Python Code"""
+    with open("insertion.txt", mode="w") as file:
+        file.write(python_code)
     Settings.llm = Ollama(
         model="llama3", request_timeout=360.0, base_url=ollama_base_url
     )
@@ -15,7 +17,7 @@ def parse_using_llm(python_code: str):
     llm = Settings.llm
     llm_str = """\
         Given a python code, you need to retrieve only the python code. Do not put any header in your answer.
-        Be careful to not forget any python code. You are required to use the following format, each taking one line:
+        Do not remove or modify any python code. You are required to use the following format, each taking one line:
 
         **Python Code**: Python code here
         **Answer**: Answer here
