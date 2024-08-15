@@ -30,4 +30,5 @@ def ssh_everything(user_query: str, path: str, file_name):
     response = database(without_distinct, path, file_name)
     if response is not None:
         return response
-    return analyse(user_query)
+    else:
+        return analyse(user_query)
