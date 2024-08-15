@@ -51,6 +51,7 @@ drop_empty_tables(engine, Base)
                 attempts += 1
                 logger.info(f"The LLM failed to generate the database. {attempts} times")
                 if attempts == 3:
+                    logger.info("Maximum attempts reached")
                     return "The LLM failed to generated the database..."
     engine = create_engine("sqlite:///logs.db")
     inspector = inspect(engine)

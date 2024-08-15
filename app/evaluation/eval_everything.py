@@ -24,6 +24,8 @@ def eval_everything(
                     logger.info(
                         f"Attempts for the task {task}: {successfull_attempts}, Output: {len(output_list)}, Ground-Truth: {ground_truth}"
                     )
+                    with open("evaluation.txt", mode="a") as file:
+                        file.write(f"Output: {len(output_list)}, Ground_Truth: {ground_truth}\n")
             except:
                 logger.info("Task failed, trying once again...")
         precision = sum / 5 / ground_truth
@@ -35,12 +37,12 @@ if __name__ == "__main__":
     file_names = ["auth.log", "auth2.log", "auth3.log"]
 
     tasks = [
-        "Please list all users with their username that failed to log in",
-        "Please list all users with their username that successfully logged in"
+        "Please list all distinct users with their username and number of attempts that failed to log in",
+        "Please list all users with their username and number of attempts that successfully logged in"
     ]
-    ground_truths = [2831, 190]
-    ground_truths2 = [7319, 221]
-    ground_truths3 = [7845, 436]
+    ground_truths = [558, 5]
+    ground_truths2 = [1536, 11]
+    ground_truths3 = [757, 11]
 
     precision = []
     list_ground_truths = [ground_truths, ground_truths2, ground_truths3]
@@ -52,5 +54,5 @@ if __name__ == "__main__":
         evaluation = eval_everything(tasks, list_ground_truths[i], file_name=file)
         logger.info(f"Successfully evaluate for the file: {file}")
         precision.append(evaluation)
-    with open("evaluation.txt", mode="w") as f:
-        f.write(str(precision))
+
+

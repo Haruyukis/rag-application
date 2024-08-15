@@ -104,7 +104,7 @@ class SshDatabase:
 
         table_creation_prompt_str = """\
         Given an input question and a Python code, complete the Python code by generating only the SQLAlchemy table definitions with their attributes to answer the input question.
-        Each table needs to have an `id` attribute as the primary key. Do not use any ForeignKey and relationship. Do not remove or modify any existing Python code.
+        When generating the table definition, please ensure to not generate any attributes for counting or statistics (e.g., `attempts` and `count`). Each table needs to have an `id` attribute as the primary key. Do not use any ForeignKey and relationship. Do not remove or modify any existing Python code.
 
         You are required to use the following format:
 
