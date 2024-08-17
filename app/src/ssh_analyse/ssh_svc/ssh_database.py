@@ -1,4 +1,4 @@
-from llama_index.core import Settings
+from llama_index.core import Settings, QueryBundle
 from llama_index.core.callbacks import CallbackManager
 from llama_index.core.query_pipeline import (
     QueryPipeline as QP,
@@ -6,40 +6,35 @@ from llama_index.core.query_pipeline import (
     FnComponent,
 )
 from llama_index.llms.ollama import Ollama
-from llama_index.embeddings.huggingface import HuggingFaceEmbedding
 from llama_index.core.prompts import PromptTemplate
 from llama_index.core.llms import ChatResponse
 
+
 from loguru import logger
 
+from src.helpers.parser.parser_to_python import parse_response_to_python
+from src.helpers.parser.llm_parser_to_python import parse_using_llm
 from src.helpers.sentence_indexing import sentence_indexing
-from src.config import ollama_base_url
+from src.config import ollama_base_url, llm_model
+from src.helpers.custom_llmreranker import LlamaNodePostprocessor
 
 
 class SshDatabase:
     """Ssh Database Generation"""
 
-    def __init__(self, user_query: str, folder_path: str):
+    def __init__(self, user_query: str, folder_path: str, file_name: str):
         """Constructor"""
         # Initialization
-        Settings.llm = Ollama(
-            model="llama3", request_timeout=600.0, base_url=ollama_base_url
-        )
-
-        self.llm1 = Ollama(
-            model="llama3", request_timeout=600.0, base_url=ollama_base_url
-        )
-
-        self.llm2 = Ollama(
-            model="gemma2", request_timeout=1200.0, base_url=ollama_base_url
-        )
-
         Settings.callback_manager = CallbackManager()
-        Settings.embed_model = HuggingFaceEmbedding(model_name="BAAI/bge-base-en-v1.5")
+
+        self.llm = Ollama(
+            model=llm_model, request_timeout=600.0, base_url=ollama_base_url
+        )
         self.user_query = user_query
+        self.file_name = file_name
 
         # Indexing & Query Engine
-        self.index = sentence_indexing(folder_path=folder_path)
+        self.index = sentence_indexing(folder_path=folder_path, file=file_name)
 
         # Retriever processing
         self.process_retriever_component = FnComponent(
@@ -50,12 +45,18 @@ class SshDatabase:
         self.table_creation_prompt = self.get_table_creation_prompt_template()
 
         # SQL Output Parser
-        self.python_parser_component = FnComponent(self.parse_response_to_python)
+        self.python_parser_component = FnComponent(
+            self.parse_response_to_python_from_chat
+        )
+
+        self.python_parser_component1 = FnComponent(
+            self.parse_response_to_python_from_chat1
+        )
 
         # Table Insertion PromptTemplate
         self.table_insert_prompt = (
             self.get_table_insert_prompt_template().partial_format(
-                path=f"./app/{folder_path}/auth.log"
+                path=f"./{folder_path}/{file_name}"
             )
         )
 
@@ -64,26 +65,55 @@ class SshDatabase:
 
     def run(self):
         """Answer generation"""
-
-        logger.info(f"Input: {self.user_query}")
-        logger.info("Running the query pipeline...")
+        logger.info(
+            f"Starting to run the query pipeline with the input: {self.user_query}"
+        )
         return self.query_pipeline.run(query=self.user_query)
 
     def process_retriever_component_fn(self, user_query: str):
         """Transform the output of the sentence_retriver"""
+        with open("ranking_cache.txt", mode="r") as f:
+            lines = f.readlines()
+            try:
+                if lines[0] == user_query + self.file_name + "\n":
+                    logger.info("Successfully retrieved nodes from cache")
+                    return "".join(lines[1:])
+            except:
+                logger.info("Failed to retrieve nodes from cache. No cache available")
+                logger.info("Starting to retrieve nodes")
 
-        logger.info("Sentence Retriever Output processing...")
-        sentence_retriever = self.index.as_retriever(similarity_top_k=1)
+        sentence_retriever = self.index.as_retriever(similarity_top_k=10)
 
-        relevant_node = sentence_retriever.retrieve(user_query)
-        logger.info("Relevant Node Retrieved...")
-        return relevant_node[0].text
+        nodes = sentence_retriever.retrieve(user_query)
+
+        # Create a QueryBundle from the user query
+        query_bundle = QueryBundle(query_str=user_query)
+
+        postprocessor = LlamaNodePostprocessor(
+            top_n=5,
+            llm=self.llm,
+        )
+        reranked_nodes = postprocessor.postprocess_nodes(
+            nodes=nodes, query_bundle=query_bundle
+        )
+        contexts = ""
+        for reranked_node in reranked_nodes:
+            contexts += str(reranked_node.text) + "\n"
+        with open("ranking_cache.txt", mode="w") as f:
+            logger.info("Starting to cache the relevant nodes")
+            f.write(user_query + self.file_name + "\n")
+            f.write(contexts)
+        return contexts
 
     def get_table_creation_prompt_template(self):
         """Create a Prompt Template for Table generation"""
 
         table_creation_prompt_str = """\
-        Given an input question, generate SQL tables with their attributes needed to answer to the question using python and SQLAlchemy. Focus only on the table creation. You are required to use the following format, each taking one line:
+        Given an input question and a Python code, complete the Python code by generating only the SQLAlchemy table definitions with their attributes to answer the input question.
+        Each table needs to have an `id` attribute as the primary key. Do not use any ForeignKey and relationship. Do not remove or modify any existing Python code.
+
+        You are required to use the following format:
+
         **Question**: Question here
         **Python Code**: Python Code here
         **Answer**: Final answer here
@@ -94,69 +124,102 @@ class SshDatabase:
         {retrieved_nodes}
 
         **Question**: {query_str}
-        **Python Code**:
-        
+        **Python Code**: '''\
+```python
+import re
+from sqlalchemy import Column, Integer, String, Boolean, create_engine
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import sessionmaker
+
+# Engine
+engine = create_engine("sqlite:///logs.db")
+Base = declarative_base()
+
+# The Table here
+
+
+
+
+# Creating all table above in the database.
+Base.metadata.create_all(engine)
+
+# Creating the session to the database.
+SessionMaker = sessionmaker(bind=engine)
+session = SessionMaker()
+
+
+```
+
+        '''
+        **Answer**:
+
         """
-        table_creation_prompt = PromptTemplate(table_creation_prompt_str)
-        logger.info("Starting Table Creation...")
-        return table_creation_prompt
+        logger.info("Starting to create the table")
+        return PromptTemplate(table_creation_prompt_str)
 
-    def parse_response_to_python(self, response: ChatResponse) -> str:
+    def parse_response_to_python_from_chat(self, response: ChatResponse) -> str:
         """Parse response to Python"""
-        logger.info("Table Creation Done...")
-        logger.info("Reading the python code generated")
-        response = response.message.content
-        python_query_start = response.find("**Python Code**:")
-        if python_query_start != -1:
-            response = response[python_query_start:]
-            # TODO: move to removeprefix after Python 3.9+
-            if response.startswith("**Python Code**:"):
-                response = response[len("**Python Code**:") :]
-        answer = response.find("**Answer**:")
-        if answer != -1:
-            response = response[:answer]
+        python_query = parse_response_to_python(
+            str(response.message.content), file_name="creation.txt"
+        )
+        return python_query
 
-        python_query = response.strip().strip("```").strip()
-        self.python_query = python_query
+    def parse_response_to_python_from_chat1(self, response: ChatResponse) -> str:
+        """Parse response to Python"""
+        python_query = parse_using_llm(str(response.message.content))
         return python_query
 
     def get_table_insert_prompt_template(self):
         """Create a Prompt Template for Table Insertion"""
-        logger.info("Starting Table Insertion...")
 
         table_insert_prompt_str = """\
-        Given an input question and a python code, complete the python code with a syntactically correct code to insert the rows of {path} in the database. Focus only on the insertion. You are required to use the following format, each taking one line:
+        Given an input question and a python code, complete the python code to insert each line in the database that answer the input question using regex.
+        Pay attention to the regex pattern and use `re.search()`. When generating regex patterns that include literal parentheses, please ensure they are escaped (e.g., `\\(` and `\\)`). For capturing groups, use parentheses without escaping (e.g., `(\\w+)`). Be careful about whitespace in the regex pattern.
+        When inserting inside the database, you must use `.add()`. Do not remove or modify any existing Python code.
+
+        You are required to use the following format:
 
         **Question**: Question here
-        **Regex**: Regex Pattern here
-        **Python Code**: Python Code to complete
+        **Python Code**: Python Code here
         **Answer**: Final answer here
 
-        Here are some examples of logs that must be inserted.
+        Here are some examples of logs.
         {retrieved_nodes}
-        
+
         **Question**: {query_str}
-        **Python Code**: {python_code}
+        **Python Code**:
+        ```python
+        {python_code}
+
+
+    with open({path}, "r") as logfile:
+        for line in logfile:
+            # Here is the regex
+        
+            # Here is the insertion in the database
+
+    session.commit()
+
+        
+        ```
+        
         **Answer**:
 
-        
         """
-        table_insert_prompt = PromptTemplate(table_insert_prompt_str)
 
-        return table_insert_prompt
+        return PromptTemplate(table_insert_prompt_str)
 
     def get_query_pipeline(self):
         """Create & Return the Query Pipeline of database generation"""
-
         qp = QP(
             modules={
                 "input": InputComponent(),
                 "process_retriever": self.process_retriever_component,
                 "table_creation_prompt": self.table_creation_prompt,
-                "llm1": self.llm1,
+                "llm1": self.llm,
                 "python_output_parser": self.python_parser_component,
                 "table_insert_prompt": self.table_insert_prompt,
-                "llm2": self.llm2,
+                "llm2": self.llm,
                 "python_output_parser1": self.python_parser_component,
             },
             verbose=True,

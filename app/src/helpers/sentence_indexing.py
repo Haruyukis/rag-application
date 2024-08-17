@@ -2,46 +2,52 @@ from llama_index.core import (
     Settings,
     StorageContext,
     VectorStoreIndex,
-    SimpleDirectoryReader,
     load_index_from_storage,
 )
 from llama_index.core.callbacks import CallbackManager
-from llama_index.core.node_parser import SentenceSplitter
 from llama_index.llms.ollama import Ollama
 from llama_index.embeddings.huggingface import HuggingFaceEmbedding
 
 from loguru import logger
 import os
 
+from src.config import ollama_base_url, llm_model, embedding_model
+from src.helpers.corpus_loader import sentence_load_corpus
 
-from src.config import ollama_base_url
 
-
-def sentence_indexing(folder_path: str):
-    # Initialization
+def sentence_indexing(folder_path: str, file: str) -> VectorStoreIndex:
+    # Initialization:
     Settings.llm = Ollama(
-        model="llama3", request_timeout=360.0, base_url=ollama_base_url
+        model=llm_model, request_timeout=360.0, base_url=ollama_base_url
     )
-    Settings.embed_model = HuggingFaceEmbedding(model_name="BAAI/bge-base-en-v1.5")
+    # Finetune Embedding
     Settings.callback_manager = CallbackManager()
 
-    documents = SimpleDirectoryReader(folder_path).load_data()
-    node_parser = SentenceSplitter(chunk_size=500, chunk_overlap=20)
+    logger.info("Starting to load model: llama_model_v1")
+    Settings.embed_model = HuggingFaceEmbedding(model_name=embedding_model)
+    logger.info("Successfully loaded model: llama_model_v1")
 
-    nodes = node_parser.get_nodes_from_documents(documents)
+    # Sentence Loader
+    nodes = sentence_load_corpus(
+        directory=folder_path, file=file, chunk_size=75, chunk_overlap=50
+    )
+
     for idx, node in enumerate(nodes):
         node.id_ = f"node_{idx}"
 
-    if not os.path.exists("database_index_storage"):
+    if not os.path.exists(f"database_index_storage/{file}"):
         # Indexing & Storing
-        logger.info("Indexing and Storing")
         index = VectorStoreIndex(nodes, show_progress=True)
-        index.storage_context.persist("database_index_storage")
+        index.storage_context.persist(f"database_index_storage/{file}")
+        logger.info("Successfully indexed and stored the index")
     else:
         # Loading
-        logger.info("Loading")
         storage_context = StorageContext.from_defaults(
-            persist_dir="database_index_storage"
+            persist_dir=f"database_index_storage/{file}"
         )
         index = load_index_from_storage(storage_context)
+        if not isinstance(index, VectorStoreIndex):
+            raise TypeError("Loaded index is not of type VectorStoreIndex")
+        logger.info("Successfully loaded the index")
+
     return index

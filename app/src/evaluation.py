@@ -15,7 +15,7 @@ from llama_index.core.node_parser import SentenceSplitter
 
 from loguru import logger
 
-from src.config import ollama_base_url
+from src.config import ollama_base_url, embedding_model, llm_model
 import os
 
 import pandas as pd
@@ -44,8 +44,8 @@ def display_results(name, eval_results):
 
 # Initialization
 logger.info("Doing some initialisation...")
-Settings.llm = Ollama(model="llama3", request_timeout=360.0, base_url=ollama_base_url)
-Settings.embed_model = HuggingFaceEmbedding(model_name="BAAI/bge-base-en-v1.5")
+Settings.llm = Ollama(model=llm_model, request_timeout=360.0, base_url=ollama_base_url)
+Settings.embed_model = HuggingFaceEmbedding(model_name=embedding_model)
 RagEvaluatorPack = download_llama_pack("RagEvaluatorPack", "./pack")
 logger.info("Loading and indexing data...")
 

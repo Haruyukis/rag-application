@@ -12,51 +12,35 @@ from llama_index.core.query_pipeline import (
 from llama_index.core.prompts import PromptTemplate
 from llama_index.core.llms import ChatResponse
 from llama_index.core.objects import SQLTableSchema
-from llama_index.embeddings.huggingface import HuggingFaceEmbedding
 from llama_index.llms.ollama import Ollama
 
 
-from sqlalchemy import create_engine, MetaData, Column, String, Integer
+from sqlalchemy import create_engine, inspect
 from typing import List
+
+from src.config import ollama_base_url, llm_model
+from src.helpers.sql_indexing.table_rows_indexing import index_all_tables
+from src.helpers.sql_indexing.metadata_generation import structuring_table
+from src.helpers.sql_indexing.object_indexing import object_indexing
+
 from loguru import logger
-
-from src.helpers.create_table import create_table_from_data
-from src.config import ollama_base_url
-from src.ssh_analyse.ssh_svc.helpers import (
-    index_all_tables,
-    object_indexing,
-    structuring_table,
-)
-
 
 class SshAnalyzer:
     """Ssh Analyzer Tool"""
 
-    def __init__(self, path: str):
+    def __init__(self):
         """Constructor"""
         # Init
-        self.engine = create_engine("sqlite:///logins.db")
+        self.engine = create_engine("sqlite:///logs.db")
         self.sql_database = SQLDatabase(self.engine)
 
-        Settings.embed_model = HuggingFaceEmbedding(model_name="BAAI/bge-base-en-v1.5")
         Settings.llm = Ollama(
-            model="llama3", request_timeout=360.0, base_url=ollama_base_url
+            model=llm_model, request_timeout=360.0, base_url=ollama_base_url
         )
         Settings.callback_manager = CallbackManager()
 
         # Create Table from Data
-        self.metadata_obj = MetaData()
-        self.table_names = ["failed_logins"]
-        self.columns = [
-            [
-                Column("id", Integer),
-                Column("user", String),
-            ]
-        ]
-
-        # create_table_from_data(
-        #     path, self.table_names, self.metadata_obj, self.columns, self.engine
-        # )
+        self.table_names = inspect(self.engine).get_table_names()
 
         # Structured Retrieval Metadata
         self.table_infos = structuring_table(table_names=self.table_names)
@@ -87,27 +71,20 @@ class SshAnalyzer:
 
     def run(self, query_str: str):
         """Generate an answer to the query_str."""
-        whitelist = []
-        with open(file="./data/log/whitelisteduser.txt", mode="r") as f:
-            for line in f:
-                whitelist.append(line)
-        whitelist_template = "Here are the authorized user:\n" + str(
-            whitelist
-        )  # TODO, ça n'a pas l'air de marcher, je pense que le meilleur moyen serait d'avoir une table whitelist. DONC à ne pas traiter à priori car il suffit de générer les trucs avec le LLM.
-        return self.qp.run(query=query_str + "\n" + whitelist_template)[0].get_content()
+        return self.qp.run(query=query_str)[0].get_content()
 
     def get_table_context_and_rows_str(
         self, query_str: str, strtable_schema_objs: List[SQLTableSchema]
     ):
         """Get table context string."""
-
         context_strs = []
         vector_index_dict = index_all_tables(self.sql_database, self.table_names)
 
         for table_schema_obj in strtable_schema_objs:
             table_info = self.sql_database.get_single_table_info(
                 table_schema_obj.table_name
-            )
+            ).replace("id (INTEGER), ", "")
+
             if table_schema_obj.context_str:
                 table_opt_context = " The table description is: "
                 table_opt_context += table_schema_obj.context_str
@@ -161,7 +138,6 @@ class SshAnalyzer:
         {schema}
 
         
-        Pay attention to all rows from the tables above.
         Question: {query_str}
         SQLQuery:
 
