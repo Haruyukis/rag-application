@@ -18,9 +18,9 @@ def eval_everything(
                 logger.info("Output received, trying to evaluate")
                 output_list = eval(output)
                 logger.info("Evaluation done.")
+                logger.info(output_list)
                 if isinstance(output_list, list):
                     successfull_attempts += 1
-                    sum += len(output_list)
                     logger.info(
                         f"Attempts for the task {task[1]}: {successfull_attempts} for the file {file_name}"
                     )
