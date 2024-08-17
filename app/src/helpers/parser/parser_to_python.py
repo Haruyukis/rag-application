@@ -14,7 +14,7 @@ def parse_response_to_python(response: str, file_name: str) -> str:
         response = response[:answer]
 
     python_query = response.strip().strip("```").strip()
-    if python_query.startswith("python"):
+    if python_query.startswith("python") or python_query.startswith("Python"):
         python_query = python_query[len("python") :]
 
     with open(file_name, mode="a") as f:

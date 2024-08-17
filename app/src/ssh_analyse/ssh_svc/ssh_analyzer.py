@@ -23,6 +23,7 @@ from src.helpers.sql_indexing.table_rows_indexing import index_all_tables
 from src.helpers.sql_indexing.metadata_generation import structuring_table
 from src.helpers.sql_indexing.object_indexing import object_indexing
 
+from loguru import logger
 
 class SshAnalyzer:
     """Ssh Analyzer Tool"""
@@ -82,7 +83,8 @@ class SshAnalyzer:
         for table_schema_obj in strtable_schema_objs:
             table_info = self.sql_database.get_single_table_info(
                 table_schema_obj.table_name
-            )
+            ).replace("id (INTEGER), ", "")
+
             if table_schema_obj.context_str:
                 table_opt_context = " The table description is: "
                 table_opt_context += table_schema_obj.context_str
@@ -125,7 +127,7 @@ class SshAnalyzer:
 
         text2sql_prompt_str = """\
         Given an input question, first create a syntactically correct {dialect} query to run, then look at the results of the query and return the answer.
-        Pay attention to use only the column names that you can see in the schema description. Be careful to not query for columns that do not exist. Pay attention to which column is in which table. Also, qualify column names with the table name when needed. There are no NULL value. You are required to use the following format, each taking one line:
+        Pay attention to use only the column names that you can see in the schema description. Be careful to not query for columns that do not exist. Pay attention to which column is in which table. Also, qualify column names with the table name when needed. You are required to use the following format, each taking one line:
 
         Question: Question here
         SQLQuery: SQL Query to run

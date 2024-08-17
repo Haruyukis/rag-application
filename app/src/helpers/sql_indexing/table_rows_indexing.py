@@ -24,7 +24,7 @@ def index_all_tables(
 
         with engine.connect() as conn:
             result = conn.execute(text(f"SELECT * FROM {table_name}"))
-            rows = result.fetchall()
+            rows = [row[1:] for row in result.fetchall()]
 
             rows_to_tuple = []
             for row in rows:

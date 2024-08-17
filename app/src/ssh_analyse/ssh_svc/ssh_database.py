@@ -110,7 +110,7 @@ class SshDatabase:
 
         table_creation_prompt_str = """\
         Given an input question and a Python code, complete the Python code by generating only the SQLAlchemy table definitions with their attributes to answer the input question.
-        Do not answer the input question. Each table needs to have an `id` attribute as the primary key. Pay attention to the table names, do not use generic names. Do not use any ForeignKey and relationship. Do not remove or modify any existing Python code.
+        Each table needs to have an `id` attribute as the primary key. Do not use any ForeignKey and relationship. Do not remove or modify any existing Python code.
 
         You are required to use the following format:
 
@@ -152,7 +152,7 @@ session = SessionMaker()
 
         '''
         **Answer**:
-        
+
         """
         logger.info("Starting to create the table")
         return PromptTemplate(table_creation_prompt_str)
@@ -174,8 +174,14 @@ session = SessionMaker()
 
         table_insert_prompt_str = """\
         Given an input question and a python code, complete the python code to insert each line in the database that answer the input question using regex.
-        Pay attention to the regex pattern and use `re.search()`. When generating regex patterns that include literal parentheses, please ensure they are escaped (e.g., `\\(` and `\\)`). For capturing groups, use parentheses without escaping (e.g., `(\\w+)`).
-        Do not answer to the input question. When inserting inside the database, you must use `.add()`. Do not remove or modify any existing Python code. You are required to use the following format:
+        Pay attention to the regex pattern and use `re.search()`. When generating regex patterns that include literal parentheses, please ensure they are escaped (e.g., `\\(` and `\\)`). For capturing groups, use parentheses without escaping (e.g., `(\\w+)`). Be careful about whitespace in the regex pattern.
+        When inserting inside the database, you must use `.add()`. Do not remove or modify any existing Python code.
+
+        You are required to use the following format:
+
+        **Question**: Question here
+        **Python Code**: Python Code here
+        **Answer**: Final answer here
 
         Here are some examples of logs.
         {retrieved_nodes}
@@ -196,7 +202,8 @@ session = SessionMaker()
 
         
         ```
-
+        
+        **Answer**:
 
         """
 
@@ -213,7 +220,7 @@ session = SessionMaker()
                 "python_output_parser": self.python_parser_component,
                 "table_insert_prompt": self.table_insert_prompt,
                 "llm2": self.llm,
-                "python_output_parser1": self.python_parser_component1,
+                "python_output_parser1": self.python_parser_component,
             },
             verbose=True,
         )

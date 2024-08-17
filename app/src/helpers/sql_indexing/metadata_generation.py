@@ -56,8 +56,8 @@ def structuring_table(table_names: List[str]) -> List[str]:
     for table_name in table_names:
         with engine.connect() as conn:
             results = conn.execute(text(f"SELECT * from {table_name} LIMIT 2"))
-            rows = results.fetchall()
-            columns = inspector.get_columns(table_name)
+            rows = [row[1:] for row in results.fetchall()]
+            columns = inspector.get_columns(table_name)[1:]
 
         # Retry system if the generation fails, Generate the metadata
         attempts = 0

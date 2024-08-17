@@ -3,13 +3,24 @@ import os
 from sqlalchemy import create_engine, inspect
 from src.helpers.execute_text2python import run_python
 from src.helpers.parser.llm_parser_to_python import parse_using_llm
+from src.helpers.query_refine import clean_user_query
 from src.ssh_analyse.ssh_svc.ssh_analyzer import SshAnalyzer
 from src.ssh_analyse.ssh_svc.ssh_database import SshDatabase
 from loguru import logger
 
 def analyse(user_query: str):
     analyzer = SshAnalyzer()
-    return analyzer.run(user_query)
+    attempts = 0
+    while attempts < 3:
+        try:
+            response = analyzer.run(user_query)
+            break
+        except:
+            attempts+=1
+            logger.info(f"Attempts failed for ssh analysis: {attempts} times")
+            if attempts == 3:
+                return "Failed to analyze the ssh"
+    return response
 
 
 def database(user_query: str, folder_path: str, file: str):
