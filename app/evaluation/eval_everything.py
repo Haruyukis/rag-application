@@ -11,25 +11,26 @@ def eval_everything(
         logger.info(f"Starting the evaluation for the task: {task[1]}")
         successfull_attempts = 0
         while successfull_attempts < 5:
-            output = ssh_everything(
-                user_query_database=task[0], user_query_analyzer=task[1], path="./data/log", file_name=file_name
-            )
-            logger.info("Output received, trying to evaluate")
-            output_list = eval(output)
-            logger.info("Evaluation done.")
-            if isinstance(output_list, list):
-                successfull_attempts += 1
-                sum += len(output_list)
-                logger.info(
-                    f"Attempts for the task {task[1]}: {successfull_attempts} for the file {file_name}"
+            try:
+                output = ssh_everything(
+                    user_query_database=task[0], user_query_analyzer=task[1], path="./data/log", file_name=file_name
                 )
-                logger.info()
-                with open("evaluation.txt", mode="a") as file:
-                    file.write(f"For the task {task[0]} on file {file_name} at the attempts: {successfull_attempts}, the output is:\n")
-                    file.write(str(output_list))
-                    file.write("\n")
-        except:
-            logger.info("Task failed, trying once again...")
+                logger.info("Output received, trying to evaluate")
+                output_list = eval(output)
+                logger.info("Evaluation done.")
+                if isinstance(output_list, list):
+                    successfull_attempts += 1
+                    sum += len(output_list)
+                    logger.info(
+                        f"Attempts for the task {task[1]}: {successfull_attempts} for the file {file_name}"
+                    )
+                    logger.info()
+                    with open("evaluation.txt", mode="a") as file:
+                        file.write(f"For the task {task[0]} on file {file_name} at the attempts: {successfull_attempts}, the output is:\n")
+                        file.write(str(output_list))
+                        file.write("\n")
+            except:
+                logger.info("Task failed, trying once again...")
 
 
 if __name__ == "__main__":
