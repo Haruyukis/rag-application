@@ -24,10 +24,10 @@ def ssh_database(user_query: str, path: str, file_name: str):
 
 
 @app.get("/api/everything")
-def ssh_everything(user_query: str, path: str, file_name):
+def ssh_everything(user_query_database: str, user_query_analyzer: str, path: str, file_name):
     """Create the database and analyse"""
-    response = database(user_query, path, file_name)
+    response = database(user_query_database, path, file_name)
     if response is not None:
         return response
     else:
-        return analyse(user_query)
+        return analyse(user_query_analyzer)
