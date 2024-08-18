@@ -72,15 +72,15 @@ class SshDatabase:
 
     def process_retriever_component_fn(self, user_query: str):
         """Transform the output of the sentence_retriver"""
-        with open("ranking_cache.txt", mode="r") as f:
-            lines = f.readlines()
-            try:
-                if lines[0] == user_query + self.file_name + "\n":
-                    logger.info("Successfully retrieved nodes from cache")
-                    return "".join(lines[1:])
-            except:
-                logger.info("Failed to retrieve nodes from cache. No cache available")
-                logger.info("Starting to retrieve nodes")
+        #with open("ranking_cache.txt", mode="r") as f:
+        #    lines = f.readlines()
+        #    try:
+        #        if lines[0] == user_query + self.file_name + "\n":
+        #            logger.info("Successfully retrieved nodes from cache")
+        #            return "".join(lines[1:])
+        #    except:
+        #        logger.info("Failed to retrieve nodes from cache. No cache available")
+        #        logger.info("Starting to retrieve nodes")
 
         sentence_retriever = self.index.as_retriever(similarity_top_k=10)
 

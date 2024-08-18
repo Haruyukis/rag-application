@@ -18,17 +18,18 @@ def eval_everything(
                 logger.info("Output received, trying to evaluate")
                 output_list = eval(output)
                 logger.info("Evaluation done.")
-                logger.info(output_list)
                 if isinstance(output_list, list):
                     successfull_attempts += 1
                     logger.info(
                         f"Attempts for the task {task[1]}: {successfull_attempts} for the file {file_name}"
                     )
-                    logger.info()
+                    logger.info("Starting to write inside the evaluation")
                     with open("evaluation.txt", mode="a") as file:
                         file.write(f"For the task {task[0]} on file {file_name} at the attempts: {successfull_attempts}, the output is:\n")
                         file.write(str(output_list))
                         file.write("\n")
+                        file.flush()
+                    logger.info("Done writing...")
             except:
                 logger.info("Task failed, trying once again...")
 
@@ -40,7 +41,7 @@ if __name__ == "__main__":
         ("Please store all usernames that successfully logged in", "Please list all distinct usernames that successfully logged in"),
         ("Please store all usernames that have their publickey accepted", "Please list all distinct usernames that have their publickey accepted"),
     ]
-    
+
 
     for i, file in enumerate(file_names):
         logger.info(f"Starting the evaluation for the file: {file}")
