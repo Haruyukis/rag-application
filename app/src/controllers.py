@@ -28,7 +28,6 @@ def ssh_database(user_query: str, path: str, file_name: str):
     """Query Engine with sentence splitter for auth.log"""
     return database(user_query, path, file_name)
 
-
 @app.get("/api/analyse")
 def ssh_analyse(user_query: str):
     """Analyzing ssh log data"""
