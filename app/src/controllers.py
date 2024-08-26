@@ -6,21 +6,9 @@ app = FastAPI()
 
 
 @app.get("/api/generate")
-def generate(user_query: str):
+def demo(user_query: str):
     response = generate_response(user_query)
     return response.response
-
-
-@app.get("/api/analyse")
-def ssh_analyse(user_query: str):
-    """Analyzing ssh log data"""
-    return analyse(user_query)
-
-
-@app.get("/api/database")
-def ssh_database(user_query: str, path: str, file_name: str):
-    """Query Engine with sentence splitter for auth.log"""
-    return database(user_query, path, file_name)
 
 
 @app.get("/api/everything")
@@ -33,3 +21,14 @@ def ssh_everything(
         return response
     else:
         return analyse(user_query_analyzer)
+
+
+@app.get("/api/database")
+def ssh_database(user_query: str, path: str, file_name: str):
+    """Query Engine with sentence splitter for auth.log"""
+    return database(user_query, path, file_name)
+
+@app.get("/api/analyse")
+def ssh_analyse(user_query: str):
+    """Analyzing ssh log data"""
+    return analyse(user_query)
