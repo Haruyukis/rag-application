@@ -37,3 +37,5 @@ After running the docker compose, a fastapi client should be opened on 0.0.0.0/8
 The first API call demo can be used to generate some answer from the essay of Paul Graham.
 
 Then, given the path and the file_name of the ssh logs that need to be analyze, please use the next functions (database, analyzer and everything).
+
+First, you need to create a database, so please call the database before the analyzer.
