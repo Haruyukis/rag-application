@@ -72,37 +72,41 @@ class SshDatabase:
 
     def process_retriever_component_fn(self, user_query: str):
         """Transform the output of the sentence_retriver"""
-        with open("ranking_cache.txt", mode="r") as f:
-            lines = f.readlines()
-            try:
-                if lines[0] == user_query + self.file_name + "\n":
-                    logger.info("Successfully retrieved nodes from cache")
-                    return "".join(lines[1:])
-            except:
-                logger.info("Failed to retrieve nodes from cache. No cache available")
-                logger.info("Starting to retrieve nodes")
+        #with open("ranking_cache.txt", mode="r") as f:
+        #    lines = f.readlines()
+        #    try:
+        #        if lines[0] == user_query + self.file_name + "\n":
+        #            logger.info("Successfully retrieved nodes from cache")
+        #            return "".join(lines[1:])
+        #    except:
+        #        logger.info("Failed to retrieve nodes from cache. No cache available")
+        #        logger.info("Starting to retrieve nodes")
 
-        sentence_retriever = self.index.as_retriever(similarity_top_k=10)
+        #sentence_retriever = self.index.as_retriever(similarity_top_k=10)
+        sentence_retriever = self.index.as_retriever(similarity_top_k=5)
 
         nodes = sentence_retriever.retrieve(user_query)
 
         # Create a QueryBundle from the user query
-        query_bundle = QueryBundle(query_str=user_query)
+        #query_bundle = QueryBundle(query_str=user_query)
 
-        postprocessor = LlamaNodePostprocessor(
-            top_n=5,
-            llm=self.llm,
-        )
-        reranked_nodes = postprocessor.postprocess_nodes(
-            nodes=nodes, query_bundle=query_bundle
-        )
+        #postprocessor = LlamaNodePostprocessor(
+        #    top_n=5,
+        #    llm=self.llm,
+        #)
+        #reranked_nodes = postprocessor.postprocess_nodes(
+        #    nodes=nodes, query_bundle=query_bundle
+        #)
         contexts = ""
-        for reranked_node in reranked_nodes:
-            contexts += str(reranked_node.text) + "\n"
-        with open("ranking_cache.txt", mode="w") as f:
-            logger.info("Starting to cache the relevant nodes")
-            f.write(user_query + self.file_name + "\n")
-            f.write(contexts)
+        for node in nodes:
+            contexts += str(node.text) + "\n"
+
+        #for reranked_node in reranked_nodes:
+        #    contexts += str(reranked_node.text) + "\n"
+        #with open("ranking_cache.txt", mode="w") as f:
+        #    logger.info("Starting to cache the relevant nodes")
+        #    f.write(user_query + self.file_name + "\n")
+        #    f.write(contexts)
         return contexts
 
     def get_table_creation_prompt_template(self):
