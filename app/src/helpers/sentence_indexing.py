@@ -1,3 +1,5 @@
+import os
+
 from llama_index.core import (
     Settings,
     StorageContext,
@@ -5,13 +7,10 @@ from llama_index.core import (
     load_index_from_storage,
 )
 from llama_index.core.callbacks import CallbackManager
-from llama_index.llms.ollama import Ollama
 from llama_index.embeddings.huggingface import HuggingFaceEmbedding
-
+from llama_index.llms.ollama import Ollama
 from loguru import logger
-import os
-
-from src.config import ollama_base_url, llm_model, embedding_model
+from src.config import embedding_model, llm_model, ollama_base_url
 from src.helpers.corpus_loader import sentence_load_corpus
 
 
@@ -20,12 +19,10 @@ def sentence_indexing(folder_path: str, file: str) -> VectorStoreIndex:
     Settings.llm = Ollama(
         model=llm_model, request_timeout=360.0, base_url=ollama_base_url
     )
-    # Finetune Embedding
+
     Settings.callback_manager = CallbackManager()
 
-    logger.info("Starting to load model: llama_model_v1")
     Settings.embed_model = HuggingFaceEmbedding(model_name=embedding_model)
-    logger.info("Successfully loaded model: llama_model_v1")
 
     # Sentence Loader
     nodes = sentence_load_corpus(

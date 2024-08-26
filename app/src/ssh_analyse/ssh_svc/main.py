@@ -1,12 +1,11 @@
 import os
 
+from loguru import logger
 from sqlalchemy import create_engine, inspect
 from src.helpers.execute_text2python import run_python
-from src.helpers.parser.llm_parser_to_python import parse_using_llm
-from src.helpers.query_refine import clean_user_query
 from src.ssh_analyse.ssh_svc.ssh_analyzer import SshAnalyzer
 from src.ssh_analyse.ssh_svc.ssh_database import SshDatabase
-from loguru import logger
+
 
 def analyse(user_query: str):
     analyzer = SshAnalyzer()
@@ -16,7 +15,7 @@ def analyse(user_query: str):
             response = analyzer.run(user_query)
             break
         except:
-            attempts+=1
+            attempts += 1
             logger.info(f"Attempts failed for ssh analysis: {attempts} times")
             if attempts == 3:
                 return "Failed to analyze the ssh"
@@ -51,13 +50,6 @@ drop_empty_tables(engine, Base)
 
             run_python(response + drop_empty_table_prompt, path="draft")
             break
-        #except:
-        #    corrected_response = parse_using_llm(response)
-        #    try:
-        #        if os.path.exists("logs.db"):
-        #            os.remove("logs.db")
-        #        run_python(corrected_response + drop_empty_table_prompt, path="draft")
-        #        break
         except:
             attempts += 1
             logger.info(f"The LLM failed to generate the database. {attempts} times")

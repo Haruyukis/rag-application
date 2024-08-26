@@ -1,24 +1,21 @@
 import asyncio
-
-from llama_index.core import SimpleDirectoryReader, Settings, VectorStoreIndex
-from llama_index.core.llama_dataset.generator import RagDatasetGenerator
-from llama_index.core.llama_dataset import LabelledRagDataset
-from llama_index.core.llama_pack import download_llama_pack
-from llama_index.llms.ollama import Ollama
-from llama_index.embeddings.huggingface import HuggingFaceEmbedding
-from llama_index.core.evaluation import (
-    RetrieverEvaluator,
-    EmbeddingQAFinetuneDataset,
-    generate_question_context_pairs,
-)
-from llama_index.core.node_parser import SentenceSplitter
-
-from loguru import logger
-
-from src.config import ollama_base_url, embedding_model, llm_model
 import os
 
 import pandas as pd
+from llama_index.core import Settings, SimpleDirectoryReader, VectorStoreIndex
+from llama_index.core.evaluation import (
+    EmbeddingQAFinetuneDataset,
+    RetrieverEvaluator,
+    generate_question_context_pairs,
+)
+from llama_index.core.llama_dataset import LabelledRagDataset
+from llama_index.core.llama_dataset.generator import RagDatasetGenerator
+from llama_index.core.llama_pack import download_llama_pack
+from llama_index.core.node_parser import SentenceSplitter
+from llama_index.embeddings.huggingface import HuggingFaceEmbedding
+from llama_index.llms.ollama import Ollama
+from loguru import logger
+from src.config import embedding_model, llm_model, ollama_base_url
 
 
 # Code from Llama-index in RetrieverEvaluator

@@ -1,11 +1,9 @@
-from llama_index.core import VectorStoreIndex, SimpleDirectoryReader, Settings
+from llama_index.core import Settings, SimpleDirectoryReader, VectorStoreIndex
 from llama_index.core.node_parser import SentenceSplitter
 from llama_index.embeddings.huggingface import HuggingFaceEmbedding
 from llama_index.llms.ollama import Ollama
 from loguru import logger
-from torch import embedding
-
-from src.config import ollama_base_url, llm_model, embedding_model
+from src.config import embedding_model, llm_model, ollama_base_url
 
 
 def generate_response(user_query: str):
