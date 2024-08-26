@@ -1,10 +1,14 @@
-# For Jetson
+# For NVIDIA Card
 
-FROM dustynv/llama-index:r35.4.1
+FROM ubuntu:20.04
 
 WORKDIR /ollama
 
 COPY model_pulling.sh .
+
+RUN apt-get update && \
+    apt-get install -y curl && \
+    apt-get clean
 
 RUN curl -fsSL https://ollama.com/install.sh | sh || (exit 0)
 
@@ -16,17 +20,13 @@ EXPOSE 11434
 
 CMD ollama serve
 
-# For basic NVIDIA Card
+# For Jetson
 
-# FROM ubuntu:20.04
+# FROM dustynv/llama-index:r35.4.1
 
 # WORKDIR /ollama
 
 # COPY model_pulling.sh .
-
-# RUN apt-get update && \
-#     apt-get install -y curl && \
-#     apt-get clean
 
 # RUN curl -fsSL https://ollama.com/install.sh | sh || (exit 0)
 
