@@ -51,7 +51,7 @@ class SshAnalyzer:
         )
 
         # Parse Response to SQL
-        self.sql_parser_component = FnComponent(fn=self.parse_response_to_sql)
+        self.sql_parser_component = FnComponent(fn=self.parse_response_to_sql_from_chat)
 
         # text2sql_prompt_template
         self.text2sql_prompt = self.get_text2sql_prompt_template()
