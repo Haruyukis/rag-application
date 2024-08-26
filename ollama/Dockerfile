@@ -1,3 +1,5 @@
+# For Jetson
+
 FROM dustynv/llama-index:r35.4.1
 
 WORKDIR /ollama
@@ -13,6 +15,8 @@ RUN ./model_pulling.sh
 EXPOSE 11434
 
 CMD ollama serve
+
+# For basic NVIDIA Card
 
 # FROM ubuntu:20.04
 

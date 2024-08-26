@@ -6,7 +6,9 @@ LogIntelligence - Analyze your ssh logs file.
 
 ### Image from dockerfile
 
-If you are using
+- If you are using a machine other than a Jetson, you should uncomment each Dockerfile corresponding to the ubuntu20.04
+
+- If you are using a Jetson, you can just run the following command.
 
 ### Commands to execute the application
 

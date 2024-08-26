@@ -1,3 +1,5 @@
+# For Jetson
+
 FROM dustynv/llama-index:r35.4.1
 
 WORKDIR /app
@@ -11,6 +13,8 @@ COPY . .
 EXPOSE 8000
 
 CMD ["uvicorn", "src.controllers:app", "--host", "0.0.0.0", "--port", "8000"]
+
+# For NVIDIA Card
 
 # FROM ubuntu:20.04
 
