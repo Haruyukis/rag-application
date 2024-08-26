@@ -32,6 +32,12 @@ def eval_everything(
                     logger.info("Done writing...")
             except:
                 logger.info("Task failed, trying once again...")
+                successfull_attempts += 1
+                with open("evaluation.txt", mode="a") as file:
+                    file.write(f"For the task {task[0]} on file {file_name} at the attempts: {successfull_attempts}, the output is:")
+                    file.write("[Failed to generate the output]")
+                    file.write("\n")
+                    file.flush()
 
 
 if __name__ == "__main__":

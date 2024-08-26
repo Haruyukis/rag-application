@@ -88,25 +88,25 @@ class SshDatabase:
         nodes = sentence_retriever.retrieve(user_query)
 
         # Create a QueryBundle from the user query
-        # query_bundle = QueryBundle(query_str=user_query)
+        #query_bundle = QueryBundle(query_str=user_query)
 
-        # postprocessor = LlamaNodePostprocessor(
-        #     top_n=5,
-        #     llm=self.llm,
-        # )
-        # reranked_nodes = postprocessor.postprocess_nodes(
-        #     nodes=nodes, query_bundle=query_bundle
-        # )
+        #postprocessor = LlamaNodePostprocessor(
+        #    top_n=5,
+        #    llm=self.llm,
+        #)
+        #reranked_nodes = postprocessor.postprocess_nodes(
+        #    nodes=nodes, query_bundle=query_bundle
+        #)
         contexts = ""
         for node in nodes:
             contexts += str(node.text) + "\n"
 
-        # for reranked_node in reranked_nodes:
-        #     contexts += str(reranked_node.text) + "\n"
-        # with open("ranking_cache.txt", mode="w") as f:
-        #     logger.info("Starting to cache the relevant nodes")
-        #     f.write(user_query + self.file_name + "\n")
-        #     f.write(contexts)
+        #for reranked_node in reranked_nodes:
+        #    contexts += str(reranked_node.text) + "\n"
+        #with open("ranking_cache.txt", mode="w") as f:
+        #    logger.info("Starting to cache the relevant nodes")
+        #    f.write(user_query + self.file_name + "\n")
+        #    f.write(contexts)
         return contexts
 
     def get_table_creation_prompt_template(self):
