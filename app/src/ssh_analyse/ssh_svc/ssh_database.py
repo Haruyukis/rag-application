@@ -1,22 +1,15 @@
-from llama_index.core import Settings, QueryBundle
+from llama_index.core import QueryBundle, Settings
 from llama_index.core.callbacks import CallbackManager
-from llama_index.core.query_pipeline import (
-    QueryPipeline as QP,
-    InputComponent,
-    FnComponent,
-)
-from llama_index.llms.ollama import Ollama
-from llama_index.core.prompts import PromptTemplate
 from llama_index.core.llms import ChatResponse
-
-
+from llama_index.core.prompts import PromptTemplate
+from llama_index.core.query_pipeline import FnComponent, InputComponent
+from llama_index.core.query_pipeline import QueryPipeline as QP
+from llama_index.llms.ollama import Ollama
 from loguru import logger
-
-from src.helpers.parser.parser_to_python import parse_response_to_python
-from src.helpers.parser.llm_parser_to_python import parse_using_llm
-from src.helpers.sentence_indexing import sentence_indexing
-from src.config import ollama_base_url, llm_model
+from src.config import llm_model, ollama_base_url
 from src.helpers.custom_llmreranker import LlamaNodePostprocessor
+from src.helpers.parser.parser_to_python import parse_response_to_python
+from src.helpers.sentence_indexing import sentence_indexing
 
 
 class SshDatabase:
@@ -49,10 +42,6 @@ class SshDatabase:
             self.parse_response_to_python_from_chat
         )
 
-        self.python_parser_component1 = FnComponent(
-            self.parse_response_to_python_from_chat1
-        )
-
         # Table Insertion PromptTemplate
         self.table_insert_prompt = (
             self.get_table_insert_prompt_template().partial_format(
@@ -72,37 +61,42 @@ class SshDatabase:
 
     def process_retriever_component_fn(self, user_query: str):
         """Transform the output of the sentence_retriver"""
-        with open("ranking_cache.txt", mode="r") as f:
-            lines = f.readlines()
-            try:
-                if lines[0] == user_query + self.file_name + "\n":
-                    logger.info("Successfully retrieved nodes from cache")
-                    return "".join(lines[1:])
-            except:
-                logger.info("Failed to retrieve nodes from cache. No cache available")
-                logger.info("Starting to retrieve nodes")
+        # with open("ranking_cache.txt", mode="r") as f:
+        #    lines = f.readlines()
+        #    try:
+        #        if lines[0] == user_query + self.file_name + "\n":
+        #            logger.info("Successfully retrieved nodes from cache")
+        #            return "".join(lines[1:])
+        #    except:
+        #        logger.info("Failed to retrieve nodes from cache. No cache available")
+        #        logger.info("Starting to retrieve nodes")
 
-        sentence_retriever = self.index.as_retriever(similarity_top_k=10)
+        # sentence_retriever = self.index.as_retriever(similarity_top_k=10)
+        sentence_retriever = self.index.as_retriever(similarity_top_k=5)
 
         nodes = sentence_retriever.retrieve(user_query)
-
+        # Re-Ranking, maybe need to change to a stronger llm
         # Create a QueryBundle from the user query
-        query_bundle = QueryBundle(query_str=user_query)
+        # query_bundle = QueryBundle(query_str=user_query)
 
-        postprocessor = LlamaNodePostprocessor(
-            top_n=5,
-            llm=self.llm,
-        )
-        reranked_nodes = postprocessor.postprocess_nodes(
-            nodes=nodes, query_bundle=query_bundle
-        )
+        # postprocessor = LlamaNodePostprocessor(
+        #    top_n=5,
+        #    llm=self.llm,
+        # )
+        # reranked_nodes = postprocessor.postprocess_nodes(
+        #    nodes=nodes, query_bundle=query_bundle
+        # )
         contexts = ""
-        for reranked_node in reranked_nodes:
-            contexts += str(reranked_node.text) + "\n"
-        with open("ranking_cache.txt", mode="w") as f:
-            logger.info("Starting to cache the relevant nodes")
-            f.write(user_query + self.file_name + "\n")
-            f.write(contexts)
+        for node in nodes:
+            contexts += str(node.text) + "\n"
+
+        # TODO, do a better cache here (meaning, JSON which key is the file name + the user_input)
+        # for reranked_node in reranked_nodes:
+        #    contexts += str(reranked_node.text) + "\n"
+        # with open("ranking_cache.txt", mode="w") as f:
+        #    logger.info("Starting to cache the relevant nodes")
+        #    f.write(user_query + self.file_name + "\n")
+        #    f.write(contexts)
         return contexts
 
     def get_table_creation_prompt_template(self):
@@ -162,11 +156,6 @@ session = SessionMaker()
         python_query = parse_response_to_python(
             str(response.message.content), file_name="creation.txt"
         )
-        return python_query
-
-    def parse_response_to_python_from_chat1(self, response: ChatResponse) -> str:
-        """Parse response to Python"""
-        python_query = parse_using_llm(str(response.message.content))
         return python_query
 
     def get_table_insert_prompt_template(self):
