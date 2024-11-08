@@ -6,17 +6,19 @@ services:
       context: ./ollama
     networks:
       - my-network
+    runtime: nvidia
     environment:
       - OLLAMA_HOST=0.0.0.0:11434
+      - NVIDIA_VISIBLE_DEVICES=all
+    tty: true
+    stdin_open: true
 
   app:
     build:
       context: ./app
     stdin_open: true
     tty: true
-    runtime: nvidia
     environment:
-      - NVIDIA_VISIBLE_DEVICES=all
       - OLLAMA_BASE_URL=http://ollama:11434
 
     ports:
@@ -29,7 +31,7 @@ services:
       - my-network
 
     volumes:
-      - ./app:/app # TODO A retirer à la fin, quand j'aurais fini de developper, permis de changer le code du container directement depuis vscode.
+      - ./app:/app
 
 networks:
   my-network:

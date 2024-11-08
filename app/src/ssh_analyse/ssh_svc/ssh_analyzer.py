@@ -1,29 +1,22 @@
-from llama_index.core import (
-    Settings,
-    SQLDatabase,
-)
-from llama_index.core.retrievers import SQLRetriever
-from llama_index.core.callbacks import CallbackManager
-from llama_index.core.query_pipeline import (
-    FnComponent,
-    QueryPipeline as QP,
-    InputComponent,
-)
-from llama_index.core.prompts import PromptTemplate
-from llama_index.core.llms import ChatResponse
-from llama_index.core.objects import SQLTableSchema
-from llama_index.llms.ollama import Ollama
-
-
-from sqlalchemy import create_engine, inspect
 from typing import List
 
-from src.config import ollama_base_url, llm_model
-from src.helpers.sql_indexing.table_rows_indexing import index_all_tables
+from llama_index.core import Settings, SQLDatabase
+from llama_index.core.callbacks import CallbackManager
+from llama_index.core.llms import ChatResponse
+from llama_index.core.objects import SQLTableSchema
+from llama_index.core.prompts import PromptTemplate
+from llama_index.core.query_pipeline import FnComponent, InputComponent
+from llama_index.core.query_pipeline import QueryPipeline as QP
+from llama_index.core.retrievers import SQLRetriever
+from llama_index.llms.ollama import Ollama
+from loguru import logger
+from sqlalchemy import create_engine, inspect
+from src.config import llm_model, ollama_base_url
+from src.helpers.parser.parser_to_sql import parse_response_to_sql
 from src.helpers.sql_indexing.metadata_generation import structuring_table
 from src.helpers.sql_indexing.object_indexing import object_indexing
+from src.helpers.sql_indexing.table_rows_indexing import index_all_tables
 
-from loguru import logger
 
 class SshAnalyzer:
     """Ssh Analyzer Tool"""
@@ -58,7 +51,7 @@ class SshAnalyzer:
         )
 
         # Parse Response to SQL
-        self.sql_parser_component = FnComponent(fn=self.parse_response_to_sql)
+        self.sql_parser_component = FnComponent(fn=self.parse_response_to_sql_from_chat)
 
         # text2sql_prompt_template
         self.text2sql_prompt = self.get_text2sql_prompt_template()
@@ -103,24 +96,22 @@ class SshAnalyzer:
             context_strs.append(table_info)
         return "\n\n".join(context_strs)
 
-    def parse_response_to_sql(self, response: ChatResponse) -> str:
+    def parse_response_to_sql_from_chat(self, response: ChatResponse) -> str:
         """Parse response to SQL."""
-        response = response.message.content
-        response_str = str(response)
-        sql_query_start = response.find("SQLQuery:")
-        if sql_query_start != -1:
-            response = response[sql_query_start:]
-            # TODO: move to removeprefix after Python 3.9+
-            if response.startswith("SQLQuery:"):
-                response = response[len("SQLQuery:") :]
-        sql_result_start = response.find("SQLResult:")
-        if sql_result_start != -1:
-            response = response[:sql_result_start]
-        sql_query = response.strip().strip("```").strip()
-        if sql_query[-1] == ";":
-            sql_query = sql_query[:-1]
-        self.sql_query = sql_query
-        return sql_query
+        # response = response.message.content
+        # sql_query_start = response.find("SQLQuery:")
+        # if sql_query_start != -1:
+        #     response = response[sql_query_start:]
+        #     # TODO: move to removeprefix after Python 3.9+
+        #     if response.startswith("SQLQuery:"):
+        #         response = response[len("SQLQuery:") :]
+        # sql_result_start = response.find("SQLResult:")
+        # if sql_result_start != -1:
+        #     response = response[:sql_result_start]
+        # sql_query = response.strip().strip("```").strip()
+        # if sql_query[-1] == ";":
+        #     sql_query = sql_query[:-1]
+        return parse_response_to_sql(str(response.message.content))
 
     def get_text2sql_prompt_template(self):
         """Text2SQL Prompting"""
@@ -176,8 +167,6 @@ class SshAnalyzer:
                 "text2sql_llm": Settings.llm,
                 "sql_output_parser": self.sql_parser_component,
                 "sql_retriever": self.sql_retriever,
-                # "response_synthesis_prompt": self.response_synthesis_prompt,
-                # "response_synthesis_llm": Settings.llm,
             },
             verbose=True,
         )
@@ -193,14 +182,6 @@ class SshAnalyzer:
         qp.add_chain(
             ["text2sql_prompt", "text2sql_llm", "sql_output_parser", "sql_retriever"]
         )
-        # qp.add_link(
-        # "sql_output_parser", "response_synthesis_prompt", dest_key="sql_query"
-        # )
-        # qp.add_link(
-        # "sql_retriever", "response_synthesis_prompt", dest_key="context_str"
-        # )
-        # qp.add_link("input", "response_synthesis_prompt", dest_key="query_str")
-        # qp.add_link("response_synthesis_prompt", "response_synthesis_llm")
 
         return qp
 
